@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nile Bridge dApp</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Nile Bridge dApp</h1>
+          <p>Local TronLink test interface for the isolated Nile watcher.</p>
+        </div>
+        <div class="actions">
+          <button id="connectButton">Connect</button>
+          <button id="refreshButton" class="secondary">Refresh</button>
+        </div>
+      </header>
+
+      <section id="networkWarning" class="warning hidden">
+        <div>
+          <strong>Wallet is not confirmed on Nile Testnet.</strong>
+          <span>Use TronLink network selector if programmatic switching is unavailable.</span>
+        </div>
+        <button id="switchButton">Switch to Nile</button>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <span class="label">TronLink Status</span>
+          <strong id="tronLinkStatus">Checking...</strong>
+        </article>
+        <article class="card">
+          <span class="label">Connected Wallet</span>
+          <strong id="walletAddress">Not connected</strong>
+        </article>
+        <article class="card">
+          <span class="label">Current Network</span>
+          <strong id="currentNetwork">Unknown</strong>
+        </article>
+        <article class="card">
+          <span class="label">Target Network</span>
+          <strong>Nile Testnet</strong>
+        </article>
+        <article class="card">
+          <span class="label">Nile USDT Contract</span>
+          <strong id="usdtContract"></strong>
+        </article>
+        <article class="card">
+          <span class="label">Backend Indexed Balance</span>
+          <strong id="backendBalance">Loading...</strong>
+        </article>
+        <article class="card">
+          <span class="label">Wallet TRX Balance</span>
+          <strong id="walletTrx">Unavailable</strong>
+        </article>
+        <article class="card">
+          <span class="label">Wallet USDT Balance</span>
+          <strong id="walletUsdt">Unavailable</strong>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Recent Indexed Deposits</h2>
+          <span id="backendHealth">Backend: checking</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Asset</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Tx</th>
+              </tr>
+            </thead>
+            <tbody id="deposits"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="manualSwitch" class="manual hidden">
+        <h2>Manual Nile Switch</h2>
+        <ol>
+          <li>Open TronLink.</li>
+          <li>Go to the network selector.</li>
+          <li>Select Nile Testnet.</li>
+          <li>Return to this dApp.</li>
+          <li>Click Refresh.</li>
+        </ol>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
