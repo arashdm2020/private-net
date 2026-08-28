@@ -27,8 +27,8 @@ The dashboard shows:
 
 - TronLink detected and connected state.
 - Selected wallet and whether it matches the watched Nile address.
-- Current TronLink node hosts and chainId when exposed by the provider.
-- Backend global and `test_account_001` indexed balances.
+- Current TronLink network classification (`nile`, `mainnet`, `shasta`, or `unknown`), node hosts, and chainId when exposed by the provider.
+- Backend indexed Nile global and `test_account_001` balances.
 - Wallet-side TRX and USDT balances using read-only TronLink calls.
 - Recent indexed deposits with account mapping and ledger status.
 - Manual backend actions for polling and idempotent crediting.
@@ -48,13 +48,16 @@ TronLink's injected `tronWeb` is treated as an object/property, not as an invoka
 
 ## TronLink Notes
 
-`NILE_CHAIN_ID_HEX` is intentionally empty in `app.js`. Do not guess it silently. If programmatic switching is unavailable, use the manual flow:
+`NILE_CHAIN_ID_HEX` is intentionally empty in `app.js`. Do not guess it silently. Programmatic switching is disabled; the Switch action opens the manual instructions.
 
 1. Open TronLink.
 2. Go to the network selector.
 3. Select Nile Testnet.
-4. Return to this dApp.
-5. Click Refresh.
+4. If Nile is not listed, add or select the Nile testnet custom node if TronLink supports it.
+5. Return to this dApp.
+6. Click Refresh All.
+
+The dApp treats `https://api.trongrid.io` as TRON Mainnet and expects a Nile endpoint such as `https://nile.trongrid.io` before enabling wallet-side USDT comparison against the backend Nile ledger.
 
 ## Safety
 

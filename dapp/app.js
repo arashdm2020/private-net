@@ -28,11 +28,17 @@ const el = {
   walletMatchShort: document.getElementById("walletMatchShort"),
   walletMatchNotice: document.getElementById("walletMatchNotice"),
   currentNetwork: document.getElementById("currentNetwork"),
+  networkStatus: document.getElementById("networkStatus"),
   chainId: document.getElementById("chainId"),
   fullNodeHost: document.getElementById("fullNodeHost"),
   solidityNodeHost: document.getElementById("solidityNodeHost"),
   eventServerHost: document.getElementById("eventServerHost"),
   networkWarning: document.getElementById("networkWarning"),
+  networkWarningTitle: document.getElementById("networkWarningTitle"),
+  networkWarningText: document.getElementById("networkWarningText"),
+  manualSwitchPanel: document.getElementById("manualSwitchPanel"),
+  manualCurrentFullNode: document.getElementById("manualCurrentFullNode"),
+  manualCurrentFullNodeSecondary: document.getElementById("manualCurrentFullNodeSecondary"),
   backendHealth: document.getElementById("backendHealth"),
   backendGlobalBalance: document.getElementById("backendGlobalBalance"),
   backendAccountBalance: document.getElementById("backendAccountBalance"),
@@ -268,6 +274,55 @@ async function requestAccounts() {
   }
 }
 
+function classifyEndpoint(text) {
+  const normalized = String(text || "").toLowerCase();
+  if (!normalized) return null;
+  if (
+    normalized.includes("nile.trongrid.io") ||
+    normalized.includes("nileapi.tronscan.org") ||
+    normalized.includes("nileex.io") ||
+    normalized.includes("nile")
+  ) {
+    return "nile";
+  }
+  if (normalized.includes("shasta")) {
+    return "shasta";
+  }
+  if (normalized.includes("api.trongrid.io")) {
+    return "mainnet";
+  }
+  return null;
+}
+
+function detectTronNetwork(providerState) {
+  const values = [
+    providerState?.fullNode,
+    providerState?.solidityNode,
+    providerState?.eventServer,
+    providerState?.networkName,
+    providerState?.chainId,
+  ];
+  for (const value of values) {
+    const classification = classifyEndpoint(value);
+    if (classification) return classification;
+  }
+  return "unknown";
+}
+
+function networkDisplayName(classification) {
+  if (classification === "nile") return TARGET_NETWORK_NAME;
+  if (classification === "mainnet") return "Mainnet";
+  if (classification === "shasta") return "Shasta Testnet";
+  return "Unknown";
+}
+
+function networkStatusText(classification) {
+  if (classification === "nile") return "Correct network";
+  if (classification === "mainnet") return "Wrong network for this test";
+  if (classification === "shasta") return "Wrong testnet for this Nile test";
+  return "Could not confirm Nile network";
+}
+
 function detectNetwork() {
   const tw = getInjectedTronWeb(provider());
   const fullNode = tw?.fullNode?.host || "";
@@ -279,10 +334,27 @@ function detectNetwork() {
     window.tronLink?.chainId ||
     window.tronLink?.networkVersion ||
     "";
-  const hostText = [fullNode, solidityNode, eventServer].join(" ").toLowerCase();
-  const isNile = hostText.includes("nile");
-  const name = isNile ? TARGET_NETWORK_NAME : fullNode || chainId || "Unknown";
-  return { name, isNile, fullNode, solidityNode, eventServer, chainId };
+  const networkName =
+    window.tron?.networkName ||
+    window.tron?.node?.name ||
+    window.tronLink?.networkName ||
+    window.tronLink?.node?.name ||
+    "";
+  const providerState = { fullNode, solidityNode, eventServer, chainId, networkName };
+  const detectedNetwork = detectTronNetwork(providerState);
+  const isNileConfirmed = detectedNetwork === "nile";
+  return {
+    name: networkDisplayName(detectedNetwork),
+    statusText: networkStatusText(detectedNetwork),
+    detectedNetwork,
+    isNile: isNileConfirmed,
+    isNileConfirmed,
+    fullNode,
+    solidityNode,
+    eventServer,
+    chainId,
+    networkName,
+  };
 }
 
 function snapshotProviderState() {
@@ -303,6 +375,14 @@ function snapshotProviderState() {
     windowTronWebType: typeof window.tronWeb,
     providerTronWebType: typeof activeProvider?.tronWeb,
     selectedAddress,
+    watchedAddress: WATCHED_ADDRESS,
+    addressMatchesWatchedAddress: Boolean(selectedAddress && selectedAddress === WATCHED_ADDRESS),
+    detectedNetwork: network.detectedNetwork,
+    isNileConfirmed: network.isNileConfirmed,
+    fullNode: network.fullNode,
+    solidityNode: network.solidityNode,
+    eventServer: network.eventServer,
+    chainId: network.chainId,
     defaultAddress: tw?.defaultAddress || null,
     network,
   };
@@ -310,20 +390,8 @@ function snapshotProviderState() {
 }
 
 async function requestSwitchToNile() {
-  if (!NILE_CHAIN_ID_HEX) {
-    setStatus(el.actionResult, "Nile chainId is not configured. Use the manual switch instructions.", "warning");
-    return;
-  }
-  try {
-    await window.tron.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: NILE_CHAIN_ID_HEX }],
-    });
-    await refreshWallet();
-    setStatus(el.actionResult, "Switch request sent to TronLink.", "ok");
-  } catch (error) {
-    setStatus(el.actionResult, `Programmatic switch failed: ${error.message}`, "error");
-  }
+  el.manualSwitchPanel.classList.remove("hidden");
+  setStatus(el.actionResult, "Programmatic Nile switching is disabled. Follow the manual TronLink instructions, then click Refresh All.", "pending");
 }
 
 async function refreshBackend() {
@@ -360,11 +428,37 @@ async function refreshWallet() {
   snapshotProviderState();
 
   el.currentNetwork.textContent = network.name;
+  setStatus(
+    el.networkStatus,
+    network.detectedNetwork === "nile"
+      ? "Correct: Nile Testnet detected"
+      : network.detectedNetwork === "mainnet"
+        ? "Wrong: Mainnet detected. Switch TronLink to Nile Testnet manually."
+        : network.detectedNetwork === "shasta"
+          ? "Wrong: Shasta detected. Switch TronLink to Nile Testnet manually."
+          : "Unknown: Could not confirm Nile network.",
+    network.detectedNetwork === "nile" ? "ok" : network.detectedNetwork === "unknown" ? "pending" : "warning",
+  );
   el.chainId.textContent = network.chainId ? `chainId ${network.chainId}` : "chainId unavailable";
   el.fullNodeHost.textContent = network.fullNode || "Unavailable";
   el.solidityNodeHost.textContent = network.solidityNode || "Unavailable";
   el.eventServerHost.textContent = network.eventServer || "Unavailable";
+  el.manualCurrentFullNode.textContent = network.fullNode || "Unavailable";
+  el.manualCurrentFullNodeSecondary.textContent = network.fullNode || "Unavailable";
   el.networkWarning.classList.toggle("hidden", network.isNile);
+  if (!network.isNile) {
+    if (network.detectedNetwork === "mainnet") {
+      el.networkWarningTitle.textContent = "Your wallet appears to be connected to TRON Mainnet.";
+      el.networkWarningText.textContent =
+        "This dApp is configured for Nile Testnet. Do not compare wallet balances until TronLink is switched to Nile.";
+    } else if (network.detectedNetwork === "shasta") {
+      el.networkWarningTitle.textContent = "Your wallet appears to be connected to Shasta.";
+      el.networkWarningText.textContent = "This dApp is configured for Nile Testnet. Switch TronLink to Nile manually.";
+    } else {
+      el.networkWarningTitle.textContent = "Wallet is not confirmed on Nile Testnet.";
+      el.networkWarningText.textContent = "Could not confirm Nile from TronLink provider state. Use the manual switch instructions.";
+    }
+  }
 
   updateWalletMatch(address);
 
@@ -389,6 +483,14 @@ async function refreshWallet() {
     latestWallet.errors.trx = error.message;
     el.walletTrx.textContent = "Wallet-side TRX read failed";
     el.walletTrxBase.textContent = error.message;
+  }
+
+  if (!network.isNileConfirmed) {
+    latestWallet.errors.usdt = "Unavailable until Nile network is confirmed";
+    el.walletUsdt.textContent = "Unavailable until Nile network is confirmed";
+    el.walletUsdtBase.textContent = "Switch TronLink to Nile before reading wallet-side USDT";
+    updateComparison();
+    return;
   }
 
   try {
@@ -431,7 +533,9 @@ function updateComparison() {
   el.compareWallet.textContent = selectedAddress || "Not connected";
   el.compareWalletUsdt.textContent = latestWallet.usdt
     ? `${formatUnits(latestWallet.usdt, USDT_DECIMALS)} USDT`
-    : "Unavailable";
+    : latestWallet.network?.isNileConfirmed === false
+      ? "Unavailable until Nile network is confirmed"
+      : "Unavailable";
   el.compareAccountUsdt.textContent = accountUsdt ? `${accountUsdt.human} USDT` : "Loading...";
   el.compareGlobalUsdt.textContent = globalUsdt ? `${globalUsdt.human} USDT` : "Loading...";
 
@@ -441,6 +545,10 @@ function updateComparison() {
   }
   if (selectedAddress !== WATCHED_ADDRESS) {
     setStatus(el.comparisonState, "Connected wallet differs from watched address", "warning");
+    return;
+  }
+  if (!latestWallet.network?.isNileConfirmed) {
+    setStatus(el.comparisonState, "Wallet-side USDT comparison disabled until Nile network is confirmed.", "warning");
     return;
   }
   if (!latestWallet.usdt || !accountUsdt) {

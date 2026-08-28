@@ -29,10 +29,26 @@
 
       <section id="networkWarning" class="notice warning">
         <div>
-          <strong>Wallet is not confirmed on Nile Testnet.</strong>
-          <span>Programmatic switching is disabled until the Nile chainId is confirmed.</span>
+          <strong id="networkWarningTitle">Wallet is not confirmed on Nile Testnet.</strong>
+          <span id="networkWarningText">Programmatic switching is disabled until the Nile chainId is confirmed.</span>
         </div>
-        <button id="switchButton">Switch to Nile</button>
+        <button id="switchButton">How to switch to Nile</button>
+      </section>
+
+      <section id="manualSwitchPanel" class="notice pending hidden">
+        <div>
+          <strong>Manual TronLink Nile switch</strong>
+          <ol class="compact-list">
+            <li>Open TronLink.</li>
+            <li>Open the network selector.</li>
+            <li>Select Nile Testnet.</li>
+            <li>If Nile is not listed, add or select the Nile testnet custom node if TronLink supports it.</li>
+            <li>Return to this dApp.</li>
+            <li>Click Refresh All.</li>
+          </ol>
+          <span>Expected Nile fullNode: https://nile.trongrid.io</span>
+          <span>Current fullNode: <code id="manualCurrentFullNode">Unavailable</code></span>
+        </div>
       </section>
 
       <section id="walletMatchNotice" class="notice muted">
@@ -54,6 +70,7 @@
         <article class="card">
           <span class="label">Current Network</span>
           <strong id="currentNetwork">Unknown</strong>
+          <small id="networkStatus">Network status unknown</small>
           <small id="chainId">chainId unavailable</small>
         </article>
         <article class="card">
@@ -77,12 +94,12 @@
           <strong id="usdtContract"></strong>
         </article>
         <article class="card">
-          <span class="label">Backend Global USDT</span>
+          <span class="label">Backend Indexed Nile Global USDT</span>
           <strong id="backendGlobalBalance">Loading...</strong>
           <small id="backendHealth">Backend: checking</small>
         </article>
         <article class="card">
-          <span class="label">Backend Account USDT</span>
+          <span class="label">Backend Indexed Nile Account USDT</span>
           <strong id="backendAccountBalance">Loading...</strong>
           <small>test_account_001</small>
         </article>
@@ -121,9 +138,16 @@
           <li>Open TronLink.</li>
           <li>Open the network selector.</li>
           <li>Select Nile Testnet.</li>
+          <li>If Nile is not listed, add or select the Nile testnet custom node if TronLink supports it.</li>
           <li>Return to this dApp.</li>
-          <li>Click Refresh.</li>
+          <li>Click Refresh All.</li>
         </ol>
+        <div class="manual-endpoints">
+          <span>Expected Nile fullNode</span>
+          <strong>https://nile.trongrid.io</strong>
+          <span>Current fullNode</span>
+          <strong id="manualCurrentFullNodeSecondary">Unavailable</strong>
+        </div>
       </section>
 
       <section class="panel">

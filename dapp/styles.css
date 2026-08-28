@@ -122,6 +122,31 @@ button.copy {
   margin-top: 4px;
 }
 
+.compact-list {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+.manual-endpoints {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 6px 12px;
+  padding: 0 14px 14px;
+}
+
+.manual-endpoints span {
+  color: #8b949e;
+}
+
+.manual-endpoints strong {
+  overflow-wrap: anywhere;
+}
+
+code {
+  color: #c9d1d9;
+  overflow-wrap: anywhere;
+}
+
 .hidden {
   display: none;
 }
