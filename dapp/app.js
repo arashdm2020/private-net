@@ -7,10 +7,10 @@ const MYCHAIN_TRON_CHAIN_ID_HEX = "0xcd8690dc";
 const MYCHAIN_TRON_USDT_CONTRACT = "TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf";
 const MYCHAIN_TRON_WATCHED_ADDRESS = "TFP84nTasN6G3M7SxX1XmRUP5wrX2ZeoYt";
 
-const MYCHAIN_EVM_ENABLED = false;
+const MYCHAIN_EVM_ENABLED = true;
 const MYCHAIN_EVM_CHAIN_NAME = "MyChain EVM";
-const MYCHAIN_EVM_CHAIN_ID_HEX = "";
-const MYCHAIN_EVM_RPC_URL = "";
+const MYCHAIN_EVM_CHAIN_ID_HEX = "0x13527dc";
+const MYCHAIN_EVM_RPC_URL = "http://195.200.14.38:8545";
 const MYCHAIN_EVM_EXPLORER_URL = "";
 const MYCHAIN_EVM_NATIVE_SYMBOL = "TRX";
 const MYCHAIN_EVM_NATIVE_DECIMALS = 18;
@@ -380,7 +380,7 @@ async function getJson(path) {
 
 async function refreshBackend() {
   if (activeMode === "evm") {
-    latestBackend = { mode: "evm", configured: false };
+    latestBackend = { mode: "evm", configured: true, rpcUrl: MYCHAIN_EVM_RPC_URL };
     el.backendStatus.textContent = "Not configured";
     el.backendBalance.textContent = "No EVM backend balance configured yet.";
     renderDebug();
@@ -487,7 +487,7 @@ async function onNetworkClick() {
       el.networkStatusPanel.classList.remove("hidden");
       el.tronNetworkPanel.classList.add("hidden");
       el.evmConfigPanel.classList.add("hidden");
-      setMessage("MyChain network is not deployed yet. A real blockchain node RPC is required before wallets can add it.", "warning");
+      setMessage("MyChain EVM test RPC is deployed. TRON/private-chain infrastructure is not deployed yet.", "muted");
     } else {
       await addOrSwitchEvmNetwork();
     }
@@ -560,8 +560,8 @@ function setMode(mode) {
   setMessage(
     mode === "tron"
       ? "TRON mode selected. Current wallet testing uses Nile while MyChain is not deployed yet."
-      : "EVM mode selected. Wallet connection can be tested, but MyChain EVM RPC is not configured yet.",
-    mode === "tron" ? "muted" : "warning",
+      : "EVM mode selected. MyChain EVM RPC is configured for wallet network testing.",
+    "muted",
   );
   refreshAll();
 }

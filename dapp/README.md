@@ -11,12 +11,12 @@ Backend account: test_account_001
 
 ## Current Deployment Status
 
-MyChain network is not deployed yet.
+MyChain TRON/private-chain infrastructure is not deployed yet.
 
 - `195.200.14.38:8790` is the dApp frontend URL, not a blockchain RPC.
 - `127.0.0.1:8787` is the internal watcher/ledger backend, not a blockchain RPC.
-- Wallets can only add MyChain after a real node RPC is running.
 - The current TRON flow uses Nile Testnet only for watcher and ledger testing.
+- MyChain EVM test RPC is available at `http://195.200.14.38:8545`.
 
 Planned MyChain network config:
 
@@ -24,7 +24,7 @@ Planned MyChain network config:
 If EVM:
 Network name: MyChain
 RPC URL: http://195.200.14.38:8545
-Chain ID: TBD
+Chain ID: 0x13527dc
 Symbol: TRX
 Explorer: TBD
 
@@ -47,27 +47,27 @@ TRON / TronLink mode works now:
 - Shows backend indexed Nile balance for `test_account_001`.
 - Shows the wallet network as Nile Testnet when the endpoint is `https://nile.trongrid.io`.
 
-EVM / MetaMask-compatible mode is scaffolded:
+EVM / MetaMask-compatible mode is enabled for wallet network testing:
 
 - Detects `window.ethereum`.
 - Supports dependency-free EIP-6963 provider discovery.
 - Shows provider flags for MetaMask, Trust Wallet, Rabby, and Coinbase Wallet in Advanced debug.
 - Allows basic EVM wallet connection when an injected provider exists.
-- Does not enable MyChain EVM network switching until real EVM RPC config exists.
+- Uses `wallet_addEthereumChain` and `wallet_switchEthereumChain` with the public MyChain EVM RPC.
 
 EVM placeholders:
 
 ```text
-MYCHAIN_EVM_ENABLED=false
+MYCHAIN_EVM_ENABLED=true
 MYCHAIN_EVM_CHAIN_NAME=MyChain EVM
-MYCHAIN_EVM_CHAIN_ID_HEX=
-MYCHAIN_EVM_RPC_URL=
+MYCHAIN_EVM_CHAIN_ID_HEX=0x13527dc
+MYCHAIN_EVM_RPC_URL=http://195.200.14.38:8545
 MYCHAIN_EVM_EXPLORER_URL=
 MYCHAIN_EVM_NATIVE_SYMBOL=TRX
 MYCHAIN_EVM_NATIVE_DECIMALS=18
 ```
 
-To enable EVM mode later, set a real EVM chain id and RPC URL. Do not use `http://127.0.0.1:8787` or `http://195.200.14.38:8790` as EVM RPC URLs.
+Do not use `http://127.0.0.1:8787` or `http://195.200.14.38:8790` as EVM RPC URLs.
 
 ## UI
 

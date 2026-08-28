@@ -10,7 +10,7 @@
     <main class="shell">
       <header class="hero">
         <h1>MyChain Bridge dApp</h1>
-        <p>Connect with TronLink now. EVM wallets can be enabled when a MyChain EVM RPC is configured.</p>
+        <p>Connect with TronLink or add the MyChain EVM test network to a MetaMask-compatible wallet.</p>
       </header>
 
       <section class="mode-selector" aria-label="Wallet mode">
@@ -65,23 +65,24 @@
         </dl>
 
         <section id="networkStatusPanel" class="manual hidden">
-          <h2>MyChain network is not deployed yet.</h2>
+          <h2>MyChain network setup status</h2>
           <p>195.200.14.38:8790 is the dApp URL, not a blockchain RPC.</p>
           <p>127.0.0.1:8787 is the internal watcher/ledger backend, not a blockchain RPC.</p>
-          <p>Wallets can only add MyChain after a real node RPC is running.</p>
+          <p>MyChain EVM test RPC is running at http://195.200.14.38:8545.</p>
+          <p>MyChain TRON/private-chain infrastructure is not deployed yet.</p>
           <h3>Planned MyChain network config</h3>
           <div class="planned-config">
             <strong>If EVM</strong>
             <span>Network name: MyChain</span>
             <span>RPC URL: http://195.200.14.38:8545</span>
-            <span>Chain ID: TBD</span>
+            <span>Chain ID: 0x13527dc</span>
             <span>Symbol: TRX</span>
             <span>Explorer: TBD</span>
             <strong>If TRON private chain</strong>
             <span>FullNode: http://195.200.14.38:&lt;fullnode-port&gt;</span>
             <span>SolidityNode: http://195.200.14.38:&lt;solidity-port&gt;</span>
             <span>EventServer: http://195.200.14.38:&lt;event-port&gt;</span>
-            <strong>Status: Not deployed yet.</strong>
+            <strong>Status: EVM test RPC deployed; TRON private chain not deployed.</strong>
           </div>
         </section>
 
@@ -98,8 +99,15 @@
 
         <section id="evmConfigPanel" class="manual hidden">
           <h2>MyChain EVM mode</h2>
-          <p>EVM mode is not configured yet. Provide MYCHAIN_EVM_RPC_URL and MYCHAIN_EVM_CHAIN_ID to enable MetaMask/Trust Wallet network switching.</p>
-          <p>The current backend URL and this dApp URL are not blockchain RPC endpoints.</p>
+          <p>MyChain EVM RPC is configured for wallet network testing.</p>
+          <div class="planned-config">
+            <span>Network name: MyChain EVM</span>
+            <span>RPC URL: http://195.200.14.38:8545</span>
+            <span>Chain ID: 0x13527dc</span>
+            <span>Symbol: TRX</span>
+            <span>Explorer: not configured</span>
+          </div>
+          <p>The Nile backend URL and this dApp URL are not blockchain RPC endpoints.</p>
         </section>
       </section>
 
