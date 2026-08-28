@@ -3,13 +3,23 @@
 Local-only static dApp for the isolated Nile bridge test backend.
 
 ```text
-DApp: http://127.0.0.1:8790
+DApp: http://195.200.14.38:8790
 Backend upstream: http://127.0.0.1:8787
 Watched address: TFP84nTasN6G3M7SxX1XmRUP5wrX2ZeoYt
 Nile USDT contract: TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf
 ```
 
 The dApp uses TronLink for wallet/network reads and a local `/api/*` proxy for backend reads. The proxy avoids changing backend CORS and does not expose the backend publicly.
+
+The frontend service binds publicly on `0.0.0.0:8790`. The backend stays local-only on `127.0.0.1:8787`.
+
+`/api/internal/*` proxy routes require:
+
+```text
+X-DApp-Admin-Token: <DAPP_ADMIN_TOKEN>
+```
+
+Set the token in `/srv/nile-bridge-dapp/.env`; do not commit it.
 
 ## Dashboard
 
@@ -39,4 +49,5 @@ The dashboard shows:
 - No private keys.
 - No withdrawal flow.
 - No transaction broadcast.
-- Local bind only: `127.0.0.1:8790`.
+- Public dApp bind only: `0.0.0.0:8790`.
+- Backend remains local-only: `127.0.0.1:8787`.

@@ -17,6 +17,8 @@ const el = {
   refreshButton: document.getElementById("refreshButton"),
   pollButton: document.getElementById("pollButton"),
   creditButton: document.getElementById("creditButton"),
+  adminTokenInput: document.getElementById("adminTokenInput"),
+  saveTokenButton: document.getElementById("saveTokenButton"),
   switchButton: document.getElementById("switchButton"),
   actionResult: document.getElementById("actionResult"),
   tronLinkStatus: document.getElementById("tronLinkStatus"),
@@ -93,9 +95,14 @@ async function getJson(path) {
 }
 
 async function postJson(path, body = undefined) {
+  const headers = { "Content-Type": "application/json" };
+  const token = sessionStorage.getItem("nileDappAdminToken") || "";
+  if (path.startsWith("/internal/") && token) {
+    headers["X-DApp-Admin-Token"] = token;
+  }
   const response = await fetch(`${BACKEND_API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
     cache: "no-store",
   });
@@ -396,6 +403,10 @@ function attachEvents() {
   el.switchButton.addEventListener("click", requestSwitchToNile);
   el.pollButton.addEventListener("click", pollNileNow);
   el.creditButton.addEventListener("click", creditDetectedDeposits);
+  el.saveTokenButton.addEventListener("click", () => {
+    sessionStorage.setItem("nileDappAdminToken", el.adminTokenInput.value);
+    setStatus(el.actionResult, "Admin token stored for this browser tab.", "ok");
+  });
 
   document.addEventListener("click", async (event) => {
     const target = event.target;

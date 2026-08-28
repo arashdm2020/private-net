@@ -1,17 +1,32 @@
 from __future__ import annotations
 
 import http.client
+import os
 import mimetypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
 
-HOST = "127.0.0.1"
-PORT = 8790
+def load_env(path: Path) -> None:
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip())
+
+
+ROOT = Path(__file__).resolve().parent
+load_env(ROOT / ".env")
+
+HOST = os.getenv("DAPP_HOST", "0.0.0.0")
+PORT = int(os.getenv("DAPP_PORT", "8790"))
 BACKEND_HOST = "127.0.0.1"
 BACKEND_PORT = 8787
-ROOT = Path(__file__).resolve().parent
+ADMIN_TOKEN = os.getenv("DAPP_ADMIN_TOKEN", "")
 
 
 class DappHandler(BaseHTTPRequestHandler):
@@ -32,6 +47,13 @@ class DappHandler(BaseHTTPRequestHandler):
     def proxy_to_backend(self) -> None:
         parsed = urlsplit(self.path)
         backend_path = parsed.path.removeprefix("/api") or "/"
+        if backend_path.startswith("/internal/") and not self.authorized_admin_request():
+            self.send_response(401)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(b'{"status":"error","error":"missing_or_invalid_admin_token"}')
+            return
         if parsed.query:
             backend_path = f"{backend_path}?{parsed.query}"
         body_len = int(self.headers.get("Content-Length", "0"))
@@ -52,6 +74,11 @@ class DappHandler(BaseHTTPRequestHandler):
             self.wfile.write(payload)
         finally:
             conn.close()
+
+    def authorized_admin_request(self) -> bool:
+        if not ADMIN_TOKEN:
+            return False
+        return self.headers.get("X-DApp-Admin-Token") == ADMIN_TOKEN
 
     def serve_static(self) -> None:
         parsed = urlsplit(self.path)
