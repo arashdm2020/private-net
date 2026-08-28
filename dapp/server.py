@@ -44,6 +44,12 @@ class DappHandler(BaseHTTPRequestHandler):
             return
         self.send_error(404)
 
+    def do_HEAD(self) -> None:
+        if self.path.startswith("/api/"):
+            self.send_error(405)
+            return
+        self.serve_static(head_only=True)
+
     def proxy_to_backend(self) -> None:
         parsed = urlsplit(self.path)
         backend_path = parsed.path.removeprefix("/api") or "/"
@@ -80,7 +86,7 @@ class DappHandler(BaseHTTPRequestHandler):
             return False
         return self.headers.get("X-DApp-Admin-Token") == ADMIN_TOKEN
 
-    def serve_static(self) -> None:
+    def serve_static(self, head_only: bool = False) -> None:
         parsed = urlsplit(self.path)
         rel = parsed.path.lstrip("/") or "index.html"
         target = (ROOT / rel).resolve()
@@ -94,7 +100,8 @@ class DappHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        self.wfile.write(payload)
+        if not head_only:
+            self.wfile.write(payload)
 
     def log_message(self, fmt: str, *args: object) -> None:
         print("%s - %s" % (self.address_string(), fmt % args), flush=True)
