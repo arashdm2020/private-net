@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import db
 from .config import Settings, load_settings
-from .ledger import format_units, ledger_balance, recent_deposits, usd_value_base_units
+from .ledger import credit_detected_deposits, format_units, ledger_balance, recent_deposits, usd_value_base_units
 from .tron_nile import TronNileClient
 from .watcher import Watcher
 
@@ -134,3 +134,14 @@ async def deposits(limit: int = 25) -> dict[str, Any]:
 @app.post("/internal/poll-once")
 async def poll_once() -> dict[str, Any]:
     return await watcher.poll_once()
+
+
+@app.post("/internal/credit-detected")
+async def credit_detected() -> dict[str, Any]:
+    with db.connect(settings.db_path) as conn:
+        return credit_detected_deposits(
+            conn,
+            settings.tron_network,
+            settings.watch_address,
+            settings.nile_usdt_contract_address,
+        )

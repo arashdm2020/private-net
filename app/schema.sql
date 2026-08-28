@@ -71,6 +71,9 @@ CREATE TABLE IF NOT EXISTS ledger_entries (
     UNIQUE(reference_type, reference_id, direction)
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_unique_credit
+ON ledger_entries(reference_type, reference_id, asset_symbol, direction);
+
 CREATE TABLE IF NOT EXISTS watcher_errors (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     network TEXT NOT NULL,

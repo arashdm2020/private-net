@@ -8,7 +8,7 @@ from typing import Any
 
 from . import db
 from .config import Settings
-from .ledger import insert_ledger_credit
+from .ledger import credit_detected_deposits
 from .tron_nile import TronNileClient
 
 
@@ -90,6 +90,14 @@ class Watcher:
                 else:
                     usdt_state = "disabled_missing_contract_address"
 
+                with db.connect(self.settings.db_path) as conn:
+                    credited = credit_detected_deposits(
+                        conn,
+                        self.settings.tron_network,
+                        self.settings.watch_address,
+                        self.settings.nile_usdt_contract_address,
+                    )
+
                 self.last_error = None
                 self.state = "idle"
                 with db.connect(self.settings.db_path) as conn:
@@ -106,6 +114,8 @@ class Watcher:
                 return {
                     "status": "ok",
                     "inserted": inserted,
+                    "credited": credited["credited"],
+                    "duplicates_skipped": credited["duplicates_skipped"],
                     "usdt_indexing_state": usdt_state,
                     "latest_block": latest_block,
                 }
@@ -151,15 +161,6 @@ class Watcher:
                     ),
                 )
                 if cur.rowcount == 1:
-                    deposit_id = int(conn.execute("SELECT last_insert_rowid() AS id").fetchone()["id"])
-                    if status == "confirmed":
-                        insert_ledger_credit(
-                            conn,
-                            deposit_id,
-                            self.settings.tron_network,
-                            event["asset_symbol"],
-                            event["amount_base_units"],
-                        )
                     inserted += 1
             conn.commit()
         return inserted
