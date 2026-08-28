@@ -1,18 +1,11 @@
 const BACKEND_API_BASE = "/api";
 const ACCOUNT_REF = "test_account_001";
 
-const MYCHAIN_TRON_MODE_NAME = "MyChain test mode";
-const MYCHAIN_TRON_EXPECTED_ENDPOINT = "https://nile.trongrid.io";
+const TRON_WATCHER_MODE_NAME = "Backend watcher test mode";
+const NILE_EXPECTED_ENDPOINT = "https://nile.trongrid.io";
 const MYCHAIN_TRON_CHAIN_ID_HEX = "0xcd8690dc";
 const MYCHAIN_TRON_USDT_CONTRACT = "TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf";
 const MYCHAIN_TRON_WATCHED_ADDRESS = "TFP84nTasN6G3M7SxX1XmRUP5wrX2ZeoYt";
-const MYCHAIN_TRON_PARAMS = {
-  chainId: MYCHAIN_TRON_CHAIN_ID_HEX,
-  chainName: "MyChain",
-  nativeCurrency: { name: "TRX", symbol: "TRX", decimals: 6 },
-  rpcUrls: [MYCHAIN_TRON_EXPECTED_ENDPOINT],
-  blockExplorerUrls: ["https://nile.tronscan.org"],
-};
 
 const MYCHAIN_EVM_ENABLED = false;
 const MYCHAIN_EVM_CHAIN_NAME = "MyChain EVM";
@@ -50,11 +43,9 @@ const el = {
   backendStatus: document.getElementById("backendStatus"),
   backendBalance: document.getElementById("backendBalance"),
   message: document.getElementById("message"),
+  networkStatusPanel: document.getElementById("networkStatusPanel"),
   tronNetworkPanel: document.getElementById("tronNetworkPanel"),
   evmConfigPanel: document.getElementById("evmConfigPanel"),
-  copyTronFullNodeButton: document.getElementById("copyTronFullNodeButton"),
-  copyTronConfigButton: document.getElementById("copyTronConfigButton"),
-  tryTronSwitchButton: document.getElementById("tryTronSwitchButton"),
   debugOutput: document.getElementById("debugOutput"),
 };
 
@@ -82,7 +73,7 @@ function classifyEndpoint(endpoint, chainId = "", networkName = "") {
 }
 
 function networkLabel(classification) {
-  if (classification === "nile") return MYCHAIN_TRON_MODE_NAME;
+  if (classification === "nile") return "Nile Testnet";
   if (classification === "mainnet") return "Mainnet";
   if (classification === "shasta") return "Shasta";
   return "Unknown";
@@ -240,57 +231,14 @@ function isExistingChainError(error) {
 
 function showTronNetworkInfo() {
   el.tronNetworkPanel.classList.remove("hidden");
+  el.networkStatusPanel.classList.add("hidden");
   el.evmConfigPanel.classList.add("hidden");
   const state = getTronWalletState();
   if (state.network.classification === "nile") {
-    setMessage("You are already on MyChain test mode using Nile endpoint.", "ok");
+    setMessage("Wallet is on Nile Testnet. Backend watcher test mode is active.", "ok");
   } else {
-    setMessage("MyChain TRON mode uses Nile endpoints for now. Use Try automatic switch only if needed.", "muted");
+    setMessage("For current watcher testing, switch TronLink to TRON Nile Testnet manually.", "muted");
   }
-}
-
-async function addOrSwitchTronNetwork() {
-  const tronProvider = await getTronProvider();
-  if (!tronProvider || typeof tronProvider.request !== "function") {
-    showTronNetworkInfo();
-    throw new Error("TronLink provider not available");
-  }
-  if (!hasConnectedTronWallet()) await connectTronLink();
-
-  try {
-    await tronProvider.request({ method: "wallet_addEthereumChain", params: [MYCHAIN_TRON_PARAMS] });
-  } catch (error) {
-    if (error?.code === 4001) throw new Error("Switch rejected by user.");
-    if (isExistingChainError(error)) {
-      setMessage("TronLink already has Nile Testnet for this chainId. Until a real private TRON node is running, MyChain uses Nile under the hood.", "warning");
-    } else if (isUnsupportedProviderError(error)) {
-      showTronNetworkInfo();
-      throw new Error("TronLink does not support programmatic add. Add MyChain manually if available.");
-    }
-  }
-
-  try {
-    await tronProvider.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: MYCHAIN_TRON_CHAIN_ID_HEX }],
-    });
-  } catch (error) {
-    if (error?.code === 4001) throw new Error("Switch rejected by user.");
-    if (isUnsupportedProviderError(error)) {
-      showTronNetworkInfo();
-      throw new Error("TronLink does not support programmatic switch. Select MyChain or TRON Nile Testnet manually.");
-    }
-    throw error;
-  }
-
-  await new Promise((resolve) => setTimeout(resolve, 800));
-  refreshWalletState();
-  setMessage(
-    latestWalletState.network?.classification === "nile"
-      ? "Switched to MyChain test mode."
-      : "Switch request sent. Confirm the network in TronLink.",
-    latestWalletState.network?.classification === "nile" ? "ok" : "warning",
-  );
 }
 
 function providerLabel(providerObject) {
@@ -397,7 +345,8 @@ async function connectEvmWallet() {
 
 async function addOrSwitchEvmNetwork() {
   if (!MYCHAIN_EVM_ENABLED || !MYCHAIN_EVM_CHAIN_ID_HEX || !MYCHAIN_EVM_RPC_URL) {
-    el.evmConfigPanel.classList.remove("hidden");
+  el.evmConfigPanel.classList.remove("hidden");
+    el.networkStatusPanel.classList.add("hidden");
     el.tronNetworkPanel.classList.add("hidden");
     setMessage("EVM mode is not configured yet. Provide MYCHAIN_EVM_RPC_URL and MYCHAIN_EVM_CHAIN_ID to enable MetaMask/Trust Wallet network switching.", "warning");
     return;
@@ -467,7 +416,7 @@ function renderWalletState(state) {
   el.watchedAddress.textContent = activeMode === "tron" ? MYCHAIN_TRON_WATCHED_ADDRESS : "No EVM watched address configured";
   el.networkMode.textContent =
     activeMode === "tron"
-      ? "MyChain test mode using Nile endpoints"
+      ? TRON_WATCHER_MODE_NAME
       : MYCHAIN_EVM_ENABLED
         ? MYCHAIN_EVM_CHAIN_NAME
         : "EVM mode placeholder";
@@ -480,7 +429,7 @@ function renderWalletState(state) {
         ? "EVM Wallet Connected"
         : "Connect EVM Wallet";
   el.connectButton.disabled = Boolean(state.connected);
-  el.networkButton.textContent = activeMode === "tron" ? "MyChain Network Info" : "Add / Switch EVM Network";
+  el.networkButton.textContent = activeMode === "tron" ? "Network Setup Status" : "Add / Switch EVM Network";
 }
 
 async function refreshWalletState() {
@@ -535,22 +484,15 @@ async function onConnectClick() {
 async function onNetworkClick() {
   try {
     if (activeMode === "tron") {
-      showTronNetworkInfo();
+      el.networkStatusPanel.classList.remove("hidden");
+      el.tronNetworkPanel.classList.add("hidden");
+      el.evmConfigPanel.classList.add("hidden");
+      setMessage("MyChain network is not deployed yet. A real blockchain node RPC is required before wallets can add it.", "warning");
     } else {
       await addOrSwitchEvmNetwork();
     }
   } catch (error) {
     lastConnectionError = { message: String(error?.message || error), mode: activeMode };
-    setMessage(String(error?.message || error), "error");
-    renderDebug();
-  }
-}
-
-async function onTryTronSwitchClick() {
-  try {
-    await addOrSwitchTronNetwork();
-  } catch (error) {
-    lastConnectionError = { message: String(error?.message || error), mode: "tron" };
     setMessage(String(error?.message || error), "error");
     renderDebug();
   }
@@ -573,27 +515,17 @@ async function copyText(text, label) {
   setMessage(`${label} copied.`, "ok");
 }
 
-function tronConfigText() {
-  return [
-    "Network name: MyChain",
-    `Chain ID: ${MYCHAIN_TRON_CHAIN_ID_HEX}`,
-    `FullNode: ${MYCHAIN_TRON_EXPECTED_ENDPOINT}`,
-    `SolidityNode: ${MYCHAIN_TRON_EXPECTED_ENDPOINT}`,
-    `EventServer: ${MYCHAIN_TRON_EXPECTED_ENDPOINT}`,
-    "Explorer: https://nile.tronscan.org",
-  ].join("\n");
-}
-
 function renderDebug() {
   el.debugOutput.textContent = JSON.stringify(
     {
       activeMode,
       tronConfig: {
-        modeName: MYCHAIN_TRON_MODE_NAME,
-        expectedEndpoint: MYCHAIN_TRON_EXPECTED_ENDPOINT,
+        modeName: TRON_WATCHER_MODE_NAME,
+        expectedNileEndpoint: NILE_EXPECTED_ENDPOINT,
         chainId: MYCHAIN_TRON_CHAIN_ID_HEX,
         usdtContract: MYCHAIN_TRON_USDT_CONTRACT,
         watchedAddress: MYCHAIN_TRON_WATCHED_ADDRESS,
+        myChainDeployed: false,
       },
       evmConfig: {
         enabled: MYCHAIN_EVM_ENABLED,
@@ -623,10 +555,11 @@ function renderDebug() {
 function setMode(mode) {
   activeMode = mode;
   el.tronNetworkPanel.classList.add("hidden");
+  el.networkStatusPanel.classList.add("hidden");
   el.evmConfigPanel.classList.add("hidden");
   setMessage(
     mode === "tron"
-      ? "TRON mode selected. TronLink/Nile-backed MyChain test mode is available now."
+      ? "TRON mode selected. Current wallet testing uses Nile while MyChain is not deployed yet."
       : "EVM mode selected. Wallet connection can be tested, but MyChain EVM RPC is not configured yet.",
     mode === "tron" ? "muted" : "warning",
   );
@@ -639,9 +572,6 @@ function attachEvents() {
   el.connectButton.addEventListener("click", onConnectClick);
   el.networkButton.addEventListener("click", onNetworkClick);
   el.refreshButton.addEventListener("click", refreshAll);
-  el.copyTronFullNodeButton.addEventListener("click", () => copyText(MYCHAIN_TRON_EXPECTED_ENDPOINT, "FullNode"));
-  el.copyTronConfigButton.addEventListener("click", () => copyText(tronConfigText(), "MyChain config"));
-  el.tryTronSwitchButton.addEventListener("click", onTryTronSwitchClick);
   el.evmProviderSelect.addEventListener("change", (event) => {
     selectedEvmProviderIndex = Number(event.target.value || 0);
     refreshAll();

@@ -9,7 +9,32 @@ TRON watched address: TFP84nTasN6G3M7SxX1XmRUP5wrX2ZeoYt
 Backend account: test_account_001
 ```
 
-The backend remains the isolated Nile/TRON watcher service and stays local-only behind the dApp proxy. The public dApp URL is not a blockchain RPC endpoint, and the backend URL is not a blockchain RPC endpoint.
+## Current Deployment Status
+
+MyChain network is not deployed yet.
+
+- `195.200.14.38:8790` is the dApp frontend URL, not a blockchain RPC.
+- `127.0.0.1:8787` is the internal watcher/ledger backend, not a blockchain RPC.
+- Wallets can only add MyChain after a real node RPC is running.
+- The current TRON flow uses Nile Testnet only for watcher and ledger testing.
+
+Planned MyChain network config:
+
+```text
+If EVM:
+Network name: MyChain
+RPC URL: http://195.200.14.38:8545
+Chain ID: TBD
+Symbol: TRX
+Explorer: TBD
+
+If TRON private chain:
+FullNode: http://195.200.14.38:<fullnode-port>
+SolidityNode: http://195.200.14.38:<solidity-port>
+EventServer: http://195.200.14.38:<event-port>
+
+Status: Not deployed yet.
+```
 
 ## Wallet Modes
 
@@ -20,16 +45,7 @@ TRON / TronLink mode works now:
 - Uses `window.tronLink` and `tron_requestAccounts` only as compatibility fallback.
 - Treats injected `tronWeb` as an object/property, not as a function.
 - Shows backend indexed Nile balance for `test_account_001`.
-
-Current TRON test configuration:
-
-```text
-MYCHAIN_TRON_MODE_NAME=MyChain test mode
-MYCHAIN_TRON_EXPECTED_ENDPOINT=https://nile.trongrid.io
-MYCHAIN_TRON_CHAIN_ID_HEX=0xcd8690dc
-MYCHAIN_TRON_USDT_CONTRACT=TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf
-MYCHAIN_TRON_WATCHED_ADDRESS=TFP84nTasN6G3M7SxX1XmRUP5wrX2ZeoYt
-```
+- Shows the wallet network as Nile Testnet when the endpoint is `https://nile.trongrid.io`.
 
 EVM / MetaMask-compatible mode is scaffolded:
 
@@ -51,7 +67,7 @@ MYCHAIN_EVM_NATIVE_SYMBOL=TRX
 MYCHAIN_EVM_NATIVE_DECIMALS=18
 ```
 
-To enable EVM mode later, set a real EVM chain id and RPC URL. Do not use `http://127.0.0.1:8787` or `http://195.200.14.38:8790` as EVM RPC URLs; they are the backend API and dApp server, not blockchain nodes.
+To enable EVM mode later, set a real EVM chain id and RPC URL. Do not use `http://127.0.0.1:8787` or `http://195.200.14.38:8790` as EVM RPC URLs.
 
 ## UI
 
@@ -59,7 +75,7 @@ The page intentionally stays compact:
 
 - Wallet mode selector.
 - One connect button.
-- One network info/add-switch button.
+- Network Setup Status button.
 - Refresh button.
 - Minimal wallet/network/backend status.
 - Collapsed Advanced debug details.

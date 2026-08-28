@@ -41,7 +41,7 @@
 
         <div class="actions">
           <button id="connectButton" type="button">Connect TronLink</button>
-          <button id="networkButton" class="secondary" type="button">MyChain Network Info</button>
+          <button id="networkButton" class="secondary" type="button">Network Setup Status</button>
           <button id="refreshButton" class="secondary" type="button">Refresh</button>
         </div>
 
@@ -52,8 +52,8 @@
           <dd id="walletAddress">Not connected</dd>
           <dt>Current endpoint / chain</dt>
           <dd id="currentEndpoint">Unknown</dd>
-          <dt>Network mode</dt>
-          <dd id="networkMode">MyChain test mode using Nile endpoints</dd>
+          <dt>Mode</dt>
+          <dd id="networkMode">Backend watcher test mode</dd>
           <dt>Network status</dt>
           <dd id="networkDetail">Unknown</dd>
           <dt>Watched MyChain address</dt>
@@ -64,23 +64,36 @@
           <dd id="backendBalance">Loading...</dd>
         </dl>
 
+        <section id="networkStatusPanel" class="manual hidden">
+          <h2>MyChain network is not deployed yet.</h2>
+          <p>195.200.14.38:8790 is the dApp URL, not a blockchain RPC.</p>
+          <p>127.0.0.1:8787 is the internal watcher/ledger backend, not a blockchain RPC.</p>
+          <p>Wallets can only add MyChain after a real node RPC is running.</p>
+          <h3>Planned MyChain network config</h3>
+          <div class="planned-config">
+            <strong>If EVM</strong>
+            <span>Network name: MyChain</span>
+            <span>RPC URL: http://195.200.14.38:8545</span>
+            <span>Chain ID: TBD</span>
+            <span>Symbol: TRX</span>
+            <span>Explorer: TBD</span>
+            <strong>If TRON private chain</strong>
+            <span>FullNode: http://195.200.14.38:&lt;fullnode-port&gt;</span>
+            <span>SolidityNode: http://195.200.14.38:&lt;solidity-port&gt;</span>
+            <span>EventServer: http://195.200.14.38:&lt;event-port&gt;</span>
+            <strong>Status: Not deployed yet.</strong>
+          </div>
+        </section>
+
         <section id="tronNetworkPanel" class="manual hidden">
-          <h2>MyChain TRON mode</h2>
-          <p>MyChain is currently test mode backed by Nile endpoints. It is not a private TRON full node yet.</p>
+          <h2>Nile Testnet wallet status</h2>
+          <p>The connected wallet is on Nile Testnet. This supports the current backend watcher test, but it is not MyChain on-chain infrastructure.</p>
           <ol>
             <li>Open TronLink network selector.</li>
-            <li>Add custom network if available.</li>
-            <li>Name: MyChain.</li>
-            <li>FullNode: https://nile.trongrid.io.</li>
-            <li>SolidityNode: https://nile.trongrid.io.</li>
-            <li>EventServer: https://nile.trongrid.io.</li>
-            <li>Explorer: https://nile.tronscan.org.</li>
+            <li>Select TRON Nile Testnet for watcher testing.</li>
+            <li>Return to this page.</li>
+            <li>Click Refresh.</li>
           </ol>
-          <div class="manual-actions">
-            <button id="copyTronFullNodeButton" class="secondary" type="button">Copy FullNode</button>
-            <button id="copyTronConfigButton" class="secondary" type="button">Copy all config</button>
-            <button id="tryTronSwitchButton" class="secondary" type="button">Try automatic switch</button>
-          </div>
         </section>
 
         <section id="evmConfigPanel" class="manual hidden">
