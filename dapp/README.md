@@ -19,7 +19,7 @@ The page intentionally shows only:
 - Wallet connected/not connected.
 - Network classification: MyChain, Mainnet, Shasta, or Unknown.
 - Connect TronLink button.
-- Add / Switch Network button with manual instructions.
+- Switch to Nile Testnet button.
 - Watched address.
 - Backend online/offline and indexed account balance.
 - Collapsed Advanced debug details.
@@ -32,7 +32,13 @@ The dApp uses `eth_requestAccounts` as the primary connection method. `tron_requ
 
 The injected `tronWeb` value is treated as an object/property, not as a function.
 
-Programmatic network switching is intentionally disabled because no chainId has been confirmed. The Add / Switch Network button shows manual instructions. The expected endpoint is:
+Programmatic network switching uses TronLink's `wallet_switchEthereumChain` request with:
+
+```text
+0xcd8690dc
+```
+
+If TronLink reports that the network is missing, the dApp attempts `wallet_addEthereumChain` for `TRON Nile Testnet`. If either method is unsupported, the page shows manual instructions. The expected endpoint is:
 
 ```text
 https://nile.trongrid.io

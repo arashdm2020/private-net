@@ -3,7 +3,7 @@ const WATCHED_ADDRESS = "TFP84nTasN6G3M7SxX1XmRUP5wrX2ZeoYt";
 const ACCOUNT_REF = "test_account_001";
 const TARGET_NETWORK_LABEL = "MyChain Testnet";
 const EXPECTED_ENDPOINT = "https://nile.trongrid.io";
-const NILE_CHAIN_ID_HEX = "";
+const NILE_CHAIN_ID_HEX = "0xcd8690dc";
 
 let selectedAddress = null;
 let lastProviderState = {};
@@ -13,6 +13,7 @@ let latestBackend = {};
 const el = {
   connectButton: document.getElementById("connectButton"),
   networkButton: document.getElementById("networkButton"),
+  refreshButton: document.getElementById("refreshButton"),
   tronLinkStatus: document.getElementById("tronLinkStatus"),
   walletStatus: document.getElementById("walletStatus"),
   networkStatus: document.getElementById("networkStatus"),
@@ -56,9 +57,30 @@ function endpointFromTronWeb(tw) {
   return tw?.fullNode?.host || "";
 }
 
-function classifyEndpoint(endpoint) {
-  const value = String(endpoint || "").toLowerCase();
-  if (!value) return "unknown";
+function normalizeChainId(value) {
+  if (value === null || value === undefined || value === "") return "";
+  const text = String(value).trim().toLowerCase();
+  if (text.startsWith("0x")) return text;
+  if (/^\d+$/.test(text)) return `0x${BigInt(text).toString(16)}`;
+  return text;
+}
+
+function readChainId() {
+  return (
+    window.tron?.chainId ||
+    window.tron?.networkVersion ||
+    window.tronLink?.chainId ||
+    window.tronLink?.networkVersion ||
+    null
+  );
+}
+
+function classifyNetwork(endpoint, chainId = null, networkName = "") {
+  const normalizedChainId = normalizeChainId(chainId);
+  if (normalizedChainId === NILE_CHAIN_ID_HEX) return "nile";
+
+  const value = [endpoint, networkName].map((item) => String(item || "").toLowerCase()).join(" ");
+  if (!value.trim()) return "unknown";
   if (value.includes("nile")) return "nile";
   if (value.includes("shasta")) return "shasta";
   if (value.includes("api.trongrid.io")) return "mainnet";
@@ -160,7 +182,9 @@ function refreshWalletState() {
   const activeProvider = provider();
   const tw = getInjectedTronWeb(activeProvider);
   const endpoint = endpointFromTronWeb(tw);
-  const classification = classifyEndpoint(endpoint);
+  const chainId = readChainId();
+  const networkName = window.tron?.networkName || window.tronLink?.networkName || "";
+  const classification = classifyNetwork(endpoint, chainId, networkName);
   const address = readAddress(activeProvider);
 
   el.tronLinkStatus.textContent = activeProvider || tw ? "Detected" : "Not detected";
@@ -189,12 +213,9 @@ function refreshWalletState() {
     displayedNetwork: networkLabel(classification),
     fullNode: endpoint || null,
     expectedEndpoint: EXPECTED_ENDPOINT,
-    chainId:
-      window.tron?.chainId ||
-      window.tron?.networkVersion ||
-      window.tronLink?.chainId ||
-      window.tronLink?.networkVersion ||
-      null,
+    chainId,
+    normalizedChainId: normalizeChainId(chainId),
+    networkName: networkName || null,
   };
   renderDebug();
 }
@@ -211,6 +232,94 @@ async function connectWallet() {
   }
   await waitForTronWebReady(tronProvider);
   refreshWalletState();
+}
+
+function isUnsupportedSwitchError(error) {
+  const code = error?.code;
+  const message = String(error?.message || error || "");
+  return code === 4200 || code === -32601 || /unknown method|unsupported method|method not found/i.test(message);
+}
+
+function isMissingChainError(error) {
+  const code = error?.code;
+  const message = String(error?.message || error || "");
+  return code === 4902 || /not added|not found|unrecognized chain|chain.*not/i.test(message);
+}
+
+function showManualInstructions() {
+  el.manualPanel.classList.remove("hidden");
+}
+
+async function addNileNetwork(tronProvider) {
+  await tronProvider.request({
+    method: "wallet_addEthereumChain",
+    params: [
+      {
+        chainId: NILE_CHAIN_ID_HEX,
+        chainName: "TRON Nile Testnet",
+        nativeCurrency: {
+          name: "TRX",
+          symbol: "TRX",
+          decimals: 6,
+        },
+        rpcUrls: [EXPECTED_ENDPOINT],
+        blockExplorerUrls: ["https://nile.tronscan.org"],
+      },
+    ],
+  });
+}
+
+async function switchToNile() {
+  const tronProvider = await getTronProvider();
+  if (!tronProvider || typeof tronProvider.request !== "function") {
+    throw new Error("TronLink provider not available");
+  }
+
+  if (!selectedAddress) {
+    await connectWallet();
+  }
+
+  setMessage("Requesting TronLink network switch...", "muted");
+  try {
+    await tronProvider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: NILE_CHAIN_ID_HEX }],
+    });
+    setMessage("Switch request sent. Confirm it in TronLink.", "muted");
+  } catch (error) {
+    if (error?.code === 4001) {
+      throw new Error("Switch rejected by user.");
+    }
+    if (isMissingChainError(error)) {
+      try {
+        await addNileNetwork(tronProvider);
+        setMessage("Add network request sent. Confirm it in TronLink.", "muted");
+      } catch (addError) {
+        if (addError?.code === 4001) {
+          throw new Error("Switch rejected by user.");
+        }
+        if (isUnsupportedSwitchError(addError)) {
+          showManualInstructions();
+          throw new Error("TronLink does not support programmatic add. Open the network selector and choose TRON Nile Testnet.");
+        }
+        throw addError;
+      }
+    } else if (isUnsupportedSwitchError(error)) {
+      showManualInstructions();
+      throw new Error("TronLink does not support programmatic switch. Open the network selector and choose TRON Nile Testnet.");
+    } else {
+      throw error;
+    }
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 800));
+  refreshWalletState();
+  if (lastProviderState.detectedNetwork === "nile") {
+    setMessage("Switched to Nile Testnet.", "ok");
+  } else {
+    showManualInstructions();
+    setMessage("Switch request sent. If TronLink did not switch, choose TRON Nile Testnet manually.", "warning");
+  }
 }
 
 async function getJson(path) {
@@ -251,9 +360,14 @@ async function onConnectClick() {
   }
 }
 
-function showNetworkInstructions() {
-  el.manualPanel.classList.toggle("hidden");
-  setMessage("Network switch must be done manually in TronLink.", "warning");
+async function onNetworkClick() {
+  try {
+    await switchToNile();
+  } catch (error) {
+    const message = String(error?.message || error || "Network switch failed");
+    setMessage(message, message.includes("rejected") ? "warning" : "error");
+    renderDebug();
+  }
 }
 
 function renderDebug() {
@@ -271,7 +385,8 @@ function renderDebug() {
 
 function attachEvents() {
   el.connectButton.addEventListener("click", onConnectClick);
-  el.networkButton.addEventListener("click", showNetworkInstructions);
+  el.networkButton.addEventListener("click", onNetworkClick);
+  el.refreshButton.addEventListener("click", refreshAll);
 
   const tron = window.tron;
   if (tron?.on) {
