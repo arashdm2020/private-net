@@ -56,8 +56,20 @@ function provider() {
   return window.tron || window.tronLink || null;
 }
 
-function tronWeb() {
-  return window.tron?.tronWeb || window.tronWeb || window.tronLink?.tronWeb || null;
+function getInjectedTronWeb(providerObject = null) {
+  if (providerObject && providerObject.tronWeb && typeof providerObject.tronWeb === "object") {
+    return providerObject.tronWeb;
+  }
+  if (window.tron && window.tron.tronWeb && typeof window.tron.tronWeb === "object") {
+    return window.tron.tronWeb;
+  }
+  if (window.tronWeb && typeof window.tronWeb === "object") {
+    return window.tronWeb;
+  }
+  if (window.tronLink && window.tronLink.tronWeb && typeof window.tronLink.tronWeb === "object") {
+    return window.tronLink.tronWeb;
+  }
+  return null;
 }
 
 function escapeHtml(value) {
@@ -93,12 +105,18 @@ function providerDiagnostics(methodAttempted = "") {
   return {
     methodAttempted,
     windowTron: Boolean(window.tron),
+    windowTronType: typeof window.tron,
     windowTronRequest: typeof window.tron?.request === "function",
+    windowTronRequestType: typeof window.tron?.request,
     windowTronTronWeb: Boolean(window.tron?.tronWeb),
+    windowTronTronWebType: typeof window.tron?.tronWeb,
     windowTronLink: Boolean(window.tronLink),
+    windowTronLinkType: typeof window.tronLink,
     windowTronLinkRequest: typeof window.tronLink?.request === "function",
     windowTronWeb: Boolean(window.tronWeb),
+    windowTronWebType: typeof window.tronWeb,
     windowTronWebRequest: typeof window.tronWeb?.request === "function",
+    providerTronWebType: typeof provider()?.tronWeb,
   };
 }
 
@@ -140,6 +158,18 @@ async function getTronProvider() {
   return null;
 }
 
+async function waitForTronWebReady(providerObject, timeoutMs = 3000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const tw = getInjectedTronWeb(providerObject);
+    if (tw && tw.defaultAddress && tw.defaultAddress.base58) {
+      return tw;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  return getInjectedTronWeb(providerObject);
+}
+
 async function getJson(path) {
   const response = await fetch(`${BACKEND_API_BASE}${path}`, { cache: "no-store" });
   if (!response.ok) throw new Error(`${path} returned ${response.status}`);
@@ -162,8 +192,8 @@ async function postJson(path, body = undefined) {
   return response.json();
 }
 
-function readAddress() {
-  const tw = tronWeb();
+function readAddress(providerObject = null) {
+  const tw = getInjectedTronWeb(providerObject);
   selectedAddress =
     window.tron?.tronWeb?.defaultAddress?.base58 ||
     tw?.defaultAddress?.base58 ||
@@ -221,6 +251,8 @@ async function connectWallet() {
   } catch (error) {
     accounts = await legacyRequestAccounts(error);
   }
+  await waitForTronWebReady(tronProvider);
+  readAddress(tronProvider);
   await refreshWallet();
   await refreshAll();
   return accounts;
@@ -237,7 +269,7 @@ async function requestAccounts() {
 }
 
 function detectNetwork() {
-  const tw = tronWeb();
+  const tw = getInjectedTronWeb(provider());
   const fullNode = tw?.fullNode?.host || "";
   const solidityNode = tw?.solidityNode?.host || "";
   const eventServer = tw?.eventServer?.host || "";
@@ -254,15 +286,22 @@ function detectNetwork() {
 }
 
 function snapshotProviderState() {
-  const tw = tronWeb();
+  const activeProvider = provider();
+  const tw = getInjectedTronWeb(activeProvider);
   const network = detectNetwork();
   lastProviderState = {
     tronDetected: Boolean(window.tron),
     tronRequestDetected: typeof window.tron?.request === "function",
+    tronType: typeof window.tron,
+    tronRequestType: typeof window.tron?.request,
+    tronTronWebType: typeof window.tron?.tronWeb,
     tronLinkDetected: Boolean(window.tronLink),
     tronLinkRequestDetected: typeof window.tronLink?.request === "function",
+    tronLinkType: typeof window.tronLink,
     tronWebDetected: Boolean(tw),
     tronWebRequestDetected: typeof window.tronWeb?.request === "function",
+    windowTronWebType: typeof window.tronWeb,
+    providerTronWebType: typeof activeProvider?.tronWeb,
     selectedAddress,
     defaultAddress: tw?.defaultAddress || null,
     network,
@@ -311,9 +350,11 @@ async function refreshBackend() {
 }
 
 async function refreshWallet() {
-  const hasProvider = Boolean(provider() || tronWeb());
+  const activeProvider = provider();
+  const tw = getInjectedTronWeb(activeProvider);
+  const hasProvider = Boolean(activeProvider || tw);
   el.tronLinkStatus.textContent = hasProvider ? "Detected" : "Not detected";
-  const address = readAddress();
+  const address = readAddress(activeProvider);
   const network = detectNetwork();
   latestWallet = { address, network, trx: null, usdt: null, errors: {} };
   snapshotProviderState();
@@ -327,17 +368,20 @@ async function refreshWallet() {
 
   updateWalletMatch(address);
 
-  if (!address || !tronWeb()) {
+  if (!address || !tw) {
     el.walletTrx.textContent = "Unavailable";
-    el.walletTrxBase.textContent = "base units unavailable";
+    el.walletTrxBase.textContent = "tronWeb object not ready";
     el.walletUsdt.textContent = "Unavailable";
-    el.walletUsdtBase.textContent = "base units unavailable";
+    el.walletUsdtBase.textContent = "tronWeb object not ready";
     updateComparison();
     return;
   }
 
   try {
-    const trx = await tronWeb().trx.getBalance(address);
+    if (!tw.trx || typeof tw.trx.getBalance !== "function") {
+      throw new Error("tronWeb object not ready");
+    }
+    const trx = await tw.trx.getBalance(address);
     latestWallet.trx = String(trx);
     el.walletTrx.textContent = `${formatUnits(trx, TRX_DECIMALS)} TRX`;
     el.walletTrxBase.textContent = `${trx} SUN`;
@@ -348,7 +392,10 @@ async function refreshWallet() {
   }
 
   try {
-    const contract = await tronWeb().contract().at(NILE_USDT_CONTRACT);
+    if (typeof tw.contract !== "function") {
+      throw new Error("tronWeb object not ready");
+    }
+    const contract = await tw.contract().at(NILE_USDT_CONTRACT);
     const raw = await contract.balanceOf(address).call();
     latestWallet.usdt = raw.toString();
     el.walletUsdt.textContent = `${formatUnits(latestWallet.usdt, USDT_DECIMALS)} USDT`;

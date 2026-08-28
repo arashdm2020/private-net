@@ -44,6 +44,8 @@ eth_requestAccounts
 
 `tron_requestAccounts` is kept only as a legacy fallback when the provider clearly reports that `eth_requestAccounts` is unsupported or unknown. User rejection is not retried with a fallback.
 
+TronLink's injected `tronWeb` is treated as an object/property, not as an invokable function.
+
 ## TronLink Notes
 
 `NILE_CHAIN_ID_HEX` is intentionally empty in `app.js`. Do not guess it silently. If programmatic switching is unavailable, use the manual flow:
