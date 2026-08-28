@@ -4,6 +4,17 @@ const ACCOUNT_REF = "test_account_001";
 const TARGET_NETWORK_LABEL = "MyChain Testnet";
 const EXPECTED_ENDPOINT = "https://nile.trongrid.io";
 const NILE_CHAIN_ID_HEX = "0xcd8690dc";
+const MYCHAIN_PARAMS = {
+  chainId: NILE_CHAIN_ID_HEX,
+  chainName: "MyChain",
+  nativeCurrency: {
+    name: "TRX",
+    symbol: "TRX",
+    decimals: 6,
+  },
+  rpcUrls: [EXPECTED_ENDPOINT],
+  blockExplorerUrls: ["https://nile.tronscan.org"],
+};
 
 let selectedAddress = null;
 let lastProviderState = {};
@@ -246,30 +257,30 @@ function isMissingChainError(error) {
   return code === 4902 || /not added|not found|unrecognized chain|chain.*not/i.test(message);
 }
 
+function isExistingChainError(error) {
+  const message = String(error?.message || error || "");
+  return /already|exist|duplicate|same chain|known chain|chain.*added/i.test(message);
+}
+
 function showManualInstructions() {
   el.manualPanel.classList.remove("hidden");
 }
 
-async function addNileNetwork(tronProvider) {
+async function addMyChainNetwork(tronProvider) {
   await tronProvider.request({
     method: "wallet_addEthereumChain",
-    params: [
-      {
-        chainId: NILE_CHAIN_ID_HEX,
-        chainName: "TRON Nile Testnet",
-        nativeCurrency: {
-          name: "TRX",
-          symbol: "TRX",
-          decimals: 6,
-        },
-        rpcUrls: [EXPECTED_ENDPOINT],
-        blockExplorerUrls: ["https://nile.tronscan.org"],
-      },
-    ],
+    params: [MYCHAIN_PARAMS],
   });
 }
 
-async function switchToNile() {
+async function switchMyChain(tronProvider) {
+  await tronProvider.request({
+    method: "wallet_switchEthereumChain",
+    params: [{ chainId: NILE_CHAIN_ID_HEX }],
+  });
+}
+
+async function switchToMyChain() {
   const tronProvider = await getTronProvider();
   if (!tronProvider || typeof tronProvider.request !== "function") {
     throw new Error("TronLink provider not available");
@@ -279,46 +290,55 @@ async function switchToNile() {
     await connectWallet();
   }
 
+  setMessage("Requesting TronLink to add MyChain...", "muted");
+  try {
+    await addMyChainNetwork(tronProvider);
+    setMessage("MyChain add request sent. Confirm it in TronLink.", "muted");
+  } catch (error) {
+    if (error?.code === 4001) {
+      throw new Error("Switch rejected by user.");
+    }
+    if (isExistingChainError(error)) {
+      setMessage("TronLink already has Nile Testnet for this chainId. Until a real private TRON node is running, MyChain uses Nile under the hood.", "warning");
+    } else if (isUnsupportedSwitchError(error)) {
+      showManualInstructions();
+      throw new Error("TronLink does not support programmatic add. Open the network selector and add MyChain manually.");
+    } else {
+      lastConnectionError = {
+        code: error?.code ?? null,
+        message: String(error?.message || error || "Unknown add network error"),
+        methodAttempted: "wallet_addEthereumChain",
+      };
+      setMessage("Could not add MyChain as a custom network. Trying to switch by chainId next.", "warning");
+    }
+  }
+
   setMessage("Requesting TronLink network switch...", "muted");
   try {
-    await tronProvider.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: NILE_CHAIN_ID_HEX }],
-    });
+    await switchMyChain(tronProvider);
     setMessage("Switch request sent. Confirm it in TronLink.", "muted");
   } catch (error) {
     if (error?.code === 4001) {
       throw new Error("Switch rejected by user.");
     }
     if (isMissingChainError(error)) {
-      try {
-        await addNileNetwork(tronProvider);
-        setMessage("Add network request sent. Confirm it in TronLink.", "muted");
-      } catch (addError) {
-        if (addError?.code === 4001) {
-          throw new Error("Switch rejected by user.");
-        }
-        if (isUnsupportedSwitchError(addError)) {
-          showManualInstructions();
-          throw new Error("TronLink does not support programmatic add. Open the network selector and choose TRON Nile Testnet.");
-        }
-        throw addError;
-      }
-    } else if (isUnsupportedSwitchError(error)) {
       showManualInstructions();
-      throw new Error("TronLink does not support programmatic switch. Open the network selector and choose TRON Nile Testnet.");
-    } else {
-      throw error;
+      throw new Error("TronLink could not find this chainId. Add MyChain manually, then switch to it.");
     }
+    if (isUnsupportedSwitchError(error)) {
+      showManualInstructions();
+      throw new Error("TronLink does not support programmatic switch. Open the network selector and choose MyChain or TRON Nile Testnet.");
+    }
+    throw error;
   }
 
   await new Promise((resolve) => setTimeout(resolve, 800));
   refreshWalletState();
   if (lastProviderState.detectedNetwork === "nile") {
-    setMessage("Switched to Nile Testnet.", "ok");
+    setMessage("Switched to MyChain test mode.", "ok");
   } else {
     showManualInstructions();
-    setMessage("Switch request sent. If TronLink did not switch, choose TRON Nile Testnet manually.", "warning");
+    setMessage("Switch request sent. If TronLink did not switch, choose MyChain or TRON Nile Testnet manually.", "warning");
   }
 }
 
@@ -362,7 +382,7 @@ async function onConnectClick() {
 
 async function onNetworkClick() {
   try {
-    await switchToNile();
+    await switchToMyChain();
   } catch (error) {
     const message = String(error?.message || error || "Network switch failed");
     setMessage(message, message.includes("rejected") ? "warning" : "error");
@@ -377,6 +397,7 @@ function renderDebug() {
       providerState: lastProviderState,
       lastConnectionError,
       chainIdConfiguredForProgrammaticSwitch: Boolean(NILE_CHAIN_ID_HEX),
+      myChainNetworkParams: MYCHAIN_PARAMS,
     },
     null,
     2,
