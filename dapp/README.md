@@ -11,6 +11,19 @@ Nile USDT contract: TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf
 
 The dApp uses TronLink for wallet/network reads and a local `/api/*` proxy for backend reads. The proxy avoids changing backend CORS and does not expose the backend publicly.
 
+## Dashboard
+
+The dashboard shows:
+
+- TronLink detected and connected state.
+- Selected wallet and whether it matches the watched Nile address.
+- Current TronLink node hosts and chainId when exposed by the provider.
+- Backend global and `test_account_001` indexed balances.
+- Wallet-side TRX and USDT balances using read-only TronLink calls.
+- Recent indexed deposits with account mapping and ledger status.
+- Manual backend actions for polling and idempotent crediting.
+- Collapsible raw JSON debug output.
+
 ## TronLink Notes
 
 `NILE_CHAIN_ID_HEX` is intentionally empty in `app.js`. Do not guess it silently. If programmatic switching is unavailable, use the manual flow:
