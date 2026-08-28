@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nile Bridge Test</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: Arial, sans-serif;
+      }
+      body {
+        margin: 0;
+        background: #f7f8fa;
+        color: #17202a;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+        border-bottom: 1px solid #d8dee6;
+        padding-bottom: 16px;
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 24px;
+      }
+      .address {
+        font-family: Consolas, monospace;
+        overflow-wrap: anywhere;
+        color: #334155;
+      }
+      button {
+        border: 1px solid #1d4ed8;
+        background: #2563eb;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 12px;
+        margin: 18px 0;
+      }
+      .card {
+        background: white;
+        border: 1px solid #d8dee6;
+        border-radius: 8px;
+        padding: 14px;
+      }
+      .label {
+        color: #64748b;
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+      .value {
+        margin-top: 6px;
+        font-size: 18px;
+        font-weight: 700;
+        overflow-wrap: anywhere;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border: 1px solid #d8dee6;
+      }
+      th, td {
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 8px;
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+      th {
+        background: #eef2f7;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { background: #0f172a; color: #e5e7eb; }
+        .card, table { background: #111827; border-color: #334155; }
+        th { background: #1f2937; }
+        td, th { border-color: #334155; }
+        .address, .label { color: #cbd5e1; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Nile Bridge Test</h1>
+          <div id="address" class="address">Loading...</div>
+        </div>
+        <button id="poll">Poll once</button>
+      </header>
+      <section class="grid">
+        <div class="card"><div class="label">Health</div><div id="health" class="value">...</div></div>
+        <div class="card"><div class="label">Watcher</div><div id="watcher" class="value">...</div></div>
+        <div class="card"><div class="label">TRX Balance</div><div id="trx" class="value">...</div></div>
+        <div class="card"><div class="label">Indexed USDT</div><div id="usdt" class="value">...</div></div>
+        <div class="card"><div class="label">USDT Contract</div><div id="contract" class="value">...</div></div>
+      </section>
+      <table>
+        <thead>
+          <tr>
+            <th>Asset</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Tx</th>
+            <th>Detected</th>
+          </tr>
+        </thead>
+        <tbody id="deposits"></tbody>
+      </table>
+    </main>
+    <script>
+      async function getJson(path, options) {
+        const response = await fetch(path, options);
+        return response.json();
+      }
+
+      async function refresh() {
+        const [health, status, balance, deposits] = await Promise.all([
+          getJson("/health"),
+          getJson("/status"),
+          getJson("/balance"),
+          getJson("/deposits"),
+        ]);
+        document.getElementById("health").textContent = health.status;
+        document.getElementById("address").textContent = status.watch_address;
+        document.getElementById("watcher").textContent = status.watcher_state + " / " + (status.last_poll_time || "no poll yet");
+        document.getElementById("trx").textContent = balance.native_trx_balance.human || "unavailable";
+        document.getElementById("usdt").textContent = balance.indexed_internal_balances.USDT.human;
+        document.getElementById("contract").textContent = status.nile_usdt_contract_configured ? "configured" : "disabled_missing_contract_address";
+        document.getElementById("deposits").innerHTML = deposits.deposits.map((item) => `
+          <tr>
+            <td>${item.asset_symbol}</td>
+            <td>${item.amount_base_units}</td>
+            <td>${item.status}</td>
+            <td>${item.tx_hash}</td>
+            <td>${item.detected_at}</td>
+          </tr>
+        `).join("");
+      }
+
+      document.getElementById("poll").addEventListener("click", async () => {
+        await getJson("/internal/poll-once", { method: "POST" });
+        await refresh();
+      });
+      refresh();
+      setInterval(refresh, 15000);
+    </script>
+  </body>
+</html>

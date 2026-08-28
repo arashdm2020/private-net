@@ -1,0 +1,22 @@
+[Unit]
+Description=Nile Bridge Test Watcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/nile-bridge-test
+EnvironmentFile=/srv/nile-bridge-test/.env
+ExecStart=/srv/nile-bridge-test/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8787
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/nile-bridge-test/service.log
+StandardError=append:/var/log/nile-bridge-test/service.err.log
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/srv/nile-bridge-test /var/lib/nile-bridge-test /var/log/nile-bridge-test
+
+[Install]
+WantedBy=multi-user.target
