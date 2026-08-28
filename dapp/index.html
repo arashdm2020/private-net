@@ -10,14 +10,19 @@
     <main class="shell">
       <header class="hero">
         <h1>MyChain Bridge dApp</h1>
-        <p>Connect your TronLink wallet and switch to the test network.</p>
+        <p>Connect with TronLink now. EVM wallets can be enabled when a MyChain EVM RPC is configured.</p>
       </header>
+
+      <section class="mode-selector" aria-label="Wallet mode">
+        <button id="tronModeButton" class="mode active" type="button">TRON / TronLink</button>
+        <button id="evmModeButton" class="mode" type="button">EVM / MetaMask-compatible</button>
+      </section>
 
       <section class="connect-card">
         <div class="status-list">
           <div>
-            <span>TronLink</span>
-            <strong id="tronLinkStatus">Checking...</strong>
+            <span id="providerLabel">TronLink</span>
+            <strong id="providerStatus">Checking...</strong>
           </div>
           <div>
             <span>Wallet</span>
@@ -29,10 +34,15 @@
           </div>
         </div>
 
+        <div id="evmProviderRow" class="provider-row hidden">
+          <label for="evmProviderSelect">EVM provider</label>
+          <select id="evmProviderSelect"></select>
+        </div>
+
         <div class="actions">
-          <button id="connectButton">Connect TronLink</button>
-          <button id="networkButton" class="secondary">MyChain Network Info</button>
-          <button id="refreshButton" class="secondary">Refresh</button>
+          <button id="connectButton" type="button">Connect TronLink</button>
+          <button id="networkButton" class="secondary" type="button">MyChain Network Info</button>
+          <button id="refreshButton" class="secondary" type="button">Refresh</button>
         </div>
 
         <p id="message" class="message muted">Ready.</p>
@@ -40,24 +50,22 @@
         <dl class="details">
           <dt>Selected wallet</dt>
           <dd id="walletAddress">Not connected</dd>
-          <dt>Current endpoint</dt>
+          <dt>Current endpoint / chain</dt>
           <dd id="currentEndpoint">Unknown</dd>
           <dt>Network mode</dt>
           <dd id="networkMode">MyChain test mode using Nile endpoints</dd>
           <dt>Network status</dt>
           <dd id="networkDetail">Unknown</dd>
-          <dt>Expected endpoint</dt>
-          <dd>https://nile.trongrid.io</dd>
           <dt>Watched MyChain address</dt>
           <dd id="watchedAddress">TFP84nTasN6G3M7SxX1XmRUP5wrX2ZeoYt</dd>
           <dt>Backend</dt>
           <dd id="backendStatus">Checking...</dd>
-          <dt>Backend indexed balance</dt>
+          <dt>Backend indexed Nile balance</dt>
           <dd id="backendBalance">Loading...</dd>
         </dl>
 
-        <section id="manualPanel" class="manual hidden">
-          <h2>MyChain network info</h2>
+        <section id="tronNetworkPanel" class="manual hidden">
+          <h2>MyChain TRON mode</h2>
           <p>MyChain is currently test mode backed by Nile endpoints. It is not a private TRON full node yet.</p>
           <ol>
             <li>Open TronLink network selector.</li>
@@ -67,16 +75,18 @@
             <li>SolidityNode: https://nile.trongrid.io.</li>
             <li>EventServer: https://nile.trongrid.io.</li>
             <li>Explorer: https://nile.tronscan.org.</li>
-            <li>Return to this page.</li>
-            <li>Click Refresh.</li>
           </ol>
-          <p>Expected MyChain endpoint: <code>https://nile.trongrid.io</code></p>
-          <p>Current endpoint: <code id="manualCurrentEndpoint">Unknown</code></p>
           <div class="manual-actions">
-            <button id="copyFullNodeButton" class="secondary">Copy FullNode</button>
-            <button id="copyAllConfigButton" class="secondary">Copy all config</button>
-            <button id="trySwitchButton" class="secondary">Try automatic switch</button>
+            <button id="copyTronFullNodeButton" class="secondary" type="button">Copy FullNode</button>
+            <button id="copyTronConfigButton" class="secondary" type="button">Copy all config</button>
+            <button id="tryTronSwitchButton" class="secondary" type="button">Try automatic switch</button>
           </div>
+        </section>
+
+        <section id="evmConfigPanel" class="manual hidden">
+          <h2>MyChain EVM mode</h2>
+          <p>EVM mode is not configured yet. Provide MYCHAIN_EVM_RPC_URL and MYCHAIN_EVM_CHAIN_ID to enable MetaMask/Trust Wallet network switching.</p>
+          <p>The current backend URL and this dApp URL are not blockchain RPC endpoints.</p>
         </section>
       </section>
 

@@ -1,50 +1,98 @@
 const BACKEND_API_BASE = "/api";
-const WATCHED_ADDRESS = "TFP84nTasN6G3M7SxX1XmRUP5wrX2ZeoYt";
 const ACCOUNT_REF = "test_account_001";
-const TARGET_NETWORK_LABEL = "MyChain Testnet";
-const EXPECTED_ENDPOINT = "https://nile.trongrid.io";
-const NILE_CHAIN_ID_HEX = "0xcd8690dc";
-const MYCHAIN_PARAMS = {
-  chainId: NILE_CHAIN_ID_HEX,
+
+const MYCHAIN_TRON_MODE_NAME = "MyChain test mode";
+const MYCHAIN_TRON_EXPECTED_ENDPOINT = "https://nile.trongrid.io";
+const MYCHAIN_TRON_CHAIN_ID_HEX = "0xcd8690dc";
+const MYCHAIN_TRON_USDT_CONTRACT = "TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf";
+const MYCHAIN_TRON_WATCHED_ADDRESS = "TFP84nTasN6G3M7SxX1XmRUP5wrX2ZeoYt";
+const MYCHAIN_TRON_PARAMS = {
+  chainId: MYCHAIN_TRON_CHAIN_ID_HEX,
   chainName: "MyChain",
-  nativeCurrency: {
-    name: "TRX",
-    symbol: "TRX",
-    decimals: 6,
-  },
-  rpcUrls: [EXPECTED_ENDPOINT],
+  nativeCurrency: { name: "TRX", symbol: "TRX", decimals: 6 },
+  rpcUrls: [MYCHAIN_TRON_EXPECTED_ENDPOINT],
   blockExplorerUrls: ["https://nile.tronscan.org"],
 };
 
+const MYCHAIN_EVM_ENABLED = false;
+const MYCHAIN_EVM_CHAIN_NAME = "MyChain EVM";
+const MYCHAIN_EVM_CHAIN_ID_HEX = "";
+const MYCHAIN_EVM_RPC_URL = "";
+const MYCHAIN_EVM_EXPLORER_URL = "";
+const MYCHAIN_EVM_NATIVE_SYMBOL = "TRX";
+const MYCHAIN_EVM_NATIVE_DECIMALS = 18;
+
+let activeMode = "tron";
 let selectedAddress = null;
-let lastProviderState = {};
-let lastConnectionError = null;
+let evmProviders = [];
+let selectedEvmProviderIndex = 0;
 let latestBackend = {};
+let latestWalletState = {};
+let lastConnectionError = null;
 
 const el = {
+  tronModeButton: document.getElementById("tronModeButton"),
+  evmModeButton: document.getElementById("evmModeButton"),
+  providerLabel: document.getElementById("providerLabel"),
+  providerStatus: document.getElementById("providerStatus"),
+  walletStatus: document.getElementById("walletStatus"),
+  networkStatus: document.getElementById("networkStatus"),
+  evmProviderRow: document.getElementById("evmProviderRow"),
+  evmProviderSelect: document.getElementById("evmProviderSelect"),
   connectButton: document.getElementById("connectButton"),
   networkButton: document.getElementById("networkButton"),
   refreshButton: document.getElementById("refreshButton"),
-  copyFullNodeButton: document.getElementById("copyFullNodeButton"),
-  copyAllConfigButton: document.getElementById("copyAllConfigButton"),
-  trySwitchButton: document.getElementById("trySwitchButton"),
-  tronLinkStatus: document.getElementById("tronLinkStatus"),
-  walletStatus: document.getElementById("walletStatus"),
-  networkStatus: document.getElementById("networkStatus"),
   walletAddress: document.getElementById("walletAddress"),
   currentEndpoint: document.getElementById("currentEndpoint"),
+  networkMode: document.getElementById("networkMode"),
   networkDetail: document.getElementById("networkDetail"),
   watchedAddress: document.getElementById("watchedAddress"),
   backendStatus: document.getElementById("backendStatus"),
   backendBalance: document.getElementById("backendBalance"),
   message: document.getElementById("message"),
-  manualPanel: document.getElementById("manualPanel"),
-  manualCurrentEndpoint: document.getElementById("manualCurrentEndpoint"),
+  tronNetworkPanel: document.getElementById("tronNetworkPanel"),
+  evmConfigPanel: document.getElementById("evmConfigPanel"),
+  copyTronFullNodeButton: document.getElementById("copyTronFullNodeButton"),
+  copyTronConfigButton: document.getElementById("copyTronConfigButton"),
+  tryTronSwitchButton: document.getElementById("tryTronSwitchButton"),
   debugOutput: document.getElementById("debugOutput"),
 };
 
-function provider() {
-  return window.tron || window.tronLink || null;
+function setMessage(text, kind = "muted") {
+  el.message.textContent = text;
+  el.message.className = `message ${kind}`;
+}
+
+function normalizeChainId(value) {
+  if (value === null || value === undefined || value === "") return "";
+  const text = String(value).trim().toLowerCase();
+  if (text.startsWith("0x")) return text;
+  if (/^\d+$/.test(text)) return `0x${BigInt(text).toString(16)}`;
+  return text;
+}
+
+function classifyEndpoint(endpoint, chainId = "", networkName = "") {
+  if (normalizeChainId(chainId) === MYCHAIN_TRON_CHAIN_ID_HEX) return "nile";
+  const value = [endpoint, networkName].map((item) => String(item || "").toLowerCase()).join(" ");
+  if (!value.trim()) return "unknown";
+  if (value.includes("nile")) return "nile";
+  if (value.includes("shasta")) return "shasta";
+  if (value.includes("api.trongrid.io")) return "mainnet";
+  return "unknown";
+}
+
+function networkLabel(classification) {
+  if (classification === "nile") return MYCHAIN_TRON_MODE_NAME;
+  if (classification === "mainnet") return "Mainnet";
+  if (classification === "shasta") return "Shasta";
+  return "Unknown";
+}
+
+function networkDetail(classification) {
+  if (classification === "nile") return "Connected to Nile endpoint";
+  if (classification === "mainnet") return "Wrong network for this test";
+  if (classification === "shasta") return "Wrong test network for this test";
+  return "Could not confirm network";
 }
 
 function getInjectedTronWeb(providerObject = null) {
@@ -63,103 +111,14 @@ function getInjectedTronWeb(providerObject = null) {
   return null;
 }
 
-function setMessage(text, kind = "muted") {
-  el.message.textContent = text;
-  el.message.className = `message ${kind}`;
-}
-
-function endpointFromTronWeb(tw) {
-  return tw?.fullNode?.host || "";
-}
-
-function normalizeChainId(value) {
-  if (value === null || value === undefined || value === "") return "";
-  const text = String(value).trim().toLowerCase();
-  if (text.startsWith("0x")) return text;
-  if (/^\d+$/.test(text)) return `0x${BigInt(text).toString(16)}`;
-  return text;
-}
-
-function readChainId() {
-  return (
-    window.tron?.chainId ||
-    window.tron?.networkVersion ||
-    window.tronLink?.chainId ||
-    window.tronLink?.networkVersion ||
-    null
-  );
-}
-
-function classifyNetwork(endpoint, chainId = null, networkName = "") {
-  const normalizedChainId = normalizeChainId(chainId);
-  if (normalizedChainId === NILE_CHAIN_ID_HEX) return "nile";
-
-  const value = [endpoint, networkName].map((item) => String(item || "").toLowerCase()).join(" ");
-  if (!value.trim()) return "unknown";
-  if (value.includes("nile")) return "nile";
-  if (value.includes("shasta")) return "shasta";
-  if (value.includes("api.trongrid.io")) return "mainnet";
-  return "unknown";
-}
-
-function networkLabel(classification) {
-  if (classification === "nile") return "MyChain test mode";
-  if (classification === "mainnet") return "Mainnet";
-  if (classification === "shasta") return "Shasta";
-  return "Unknown";
-}
-
-function networkDetail(classification) {
-  if (classification === "nile") return "Connected to Nile endpoint";
-  if (classification === "mainnet") return "Wrong network for this test";
-  if (classification === "shasta") return "Wrong test network for this test";
-  return "Could not confirm network";
-}
-
-function providerDiagnostics(methodAttempted = "") {
-  const activeProvider = provider();
-  return {
-    methodAttempted,
-    windowTron: Boolean(window.tron),
-    windowTronRequestType: typeof window.tron?.request,
-    windowTronTronWebType: typeof window.tron?.tronWeb,
-    windowTronLink: Boolean(window.tronLink),
-    windowTronLinkType: typeof window.tronLink,
-    windowTronWeb: Boolean(window.tronWeb),
-    windowTronWebType: typeof window.tronWeb,
-    providerTronWebType: typeof activeProvider?.tronWeb,
-  };
-}
-
-function isTronLinkMobile() {
-  const userAgent = navigator.userAgent || "";
-  return Boolean(window.tronLink || window.tronWeb) && /mobile|android|iphone|ipad|ipod/i.test(userAgent);
-}
-
-function formatConnectionError(error, methodAttempted) {
-  lastConnectionError = {
-    code: error?.code ?? null,
-    message: String(error?.message || error || "Unknown error"),
-    ...providerDiagnostics(methodAttempted),
-  };
-  const code = lastConnectionError.code === null ? "none" : lastConnectionError.code;
-  return `Connect failed: ${lastConnectionError.message} | code=${code} | method=${methodAttempted}`;
-}
-
 async function getTronProvider() {
   const started = Date.now();
-  while (Date.now() - started < 2000) {
-    if (window.tron && typeof window.tron.request === "function") {
-      return window.tron;
-    }
+  while (Date.now() - started < 1500) {
+    if (window.tron && typeof window.tron.request === "function") return window.tron;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  if (window.tronLink && typeof window.tronLink.request === "function") {
-    return window.tronLink;
-  }
-  if (window.tronWeb && typeof window.tronWeb.request === "function") {
-    return window.tronWeb;
-  }
+  if (window.tronLink && typeof window.tronLink.request === "function") return window.tronLink;
+  if (window.tronWeb && typeof window.tronWeb.request === "function") return window.tronWeb;
   return null;
 }
 
@@ -167,24 +126,27 @@ async function waitForTronWebReady(providerObject, timeoutMs = 3000) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     const tw = getInjectedTronWeb(providerObject);
-    if (tw && tw.defaultAddress && tw.defaultAddress.base58) {
-      return tw;
-    }
+    if (tw?.defaultAddress?.base58) return tw;
     await new Promise((resolve) => setTimeout(resolve, 150));
   }
   return getInjectedTronWeb(providerObject);
 }
 
-async function legacyRequestAccounts(errorFromPrimary) {
+function hasConnectedTronWallet() {
+  return Boolean(
+    selectedAddress ||
+      window.tronWeb?.defaultAddress?.base58 ||
+      window.tron?.tronWeb?.defaultAddress?.base58,
+  );
+}
+
+async function legacyTronRequestAccounts(errorFromPrimary) {
   const code = errorFromPrimary?.code;
   const msg = String(errorFromPrimary?.message || errorFromPrimary || "");
-  if (code === 4001) {
-    throw new Error("User rejected TronLink connection");
-  }
+  if (code === 4001) throw new Error("User rejected TronLink connection");
   if (!(code === 4200 || /unknown method|unsupported method|method not found/i.test(msg))) {
     throw errorFromPrimary;
   }
-
   const params = {
     websiteName: "MyChain Bridge dApp",
     websiteIcon: window.location.origin + "/favicon.ico",
@@ -198,79 +160,10 @@ async function legacyRequestAccounts(errorFromPrimary) {
   throw new Error("TronLink does not support eth_requestAccounts and no legacy fallback is available");
 }
 
-function readAddress(providerObject = null) {
-  const tw = getInjectedTronWeb(providerObject);
-  selectedAddress =
-    tw?.defaultAddress?.base58 ||
-    window.tron?.selectedAddress ||
-    window.tronLink?.tronWeb?.defaultAddress?.base58 ||
-    null;
-  return selectedAddress;
-}
-
-function refreshWalletState() {
-  const activeProvider = provider();
-  const tw = getInjectedTronWeb(activeProvider);
-  const endpoint = endpointFromTronWeb(tw);
-  const chainId = readChainId();
-  const networkName = window.tron?.networkName || window.tronLink?.networkName || "";
-  const classification = classifyNetwork(endpoint, chainId, networkName);
-  const address = readAddress(activeProvider);
-
-  el.tronLinkStatus.textContent = activeProvider || tw ? "Detected" : "Not detected";
-  el.walletStatus.textContent = address ? "Connected" : "Not connected";
-  el.networkStatus.textContent = networkLabel(classification);
-  el.walletAddress.textContent = address || "Not connected";
-  el.currentEndpoint.textContent = endpoint || "Unknown";
-  el.networkDetail.textContent = networkDetail(classification);
-  el.manualCurrentEndpoint.textContent = endpoint || "Unknown";
-  el.connectButton.textContent = address ? "Wallet Connected" : "Connect TronLink";
-  el.connectButton.disabled = Boolean(address);
-
-  if (!address) {
-    setMessage(
-      isTronLinkMobile()
-        ? "TronLink mobile detected. If no popup appears, approve connection from the wallet browser or refresh this page inside TronLink Discover."
-        : "Connect TronLink to continue.",
-      "muted",
-    );
-  } else if (classification === "nile") {
-    setMessage("Wallet already connected. Network is MyChain test mode using Nile endpoint.", "ok");
-  } else if (classification === "mainnet") {
-    setMessage("Wallet connected, but network appears to be Mainnet. Please switch to MyChain.", "warning");
-  } else {
-    setMessage("Network switch must be done manually in TronLink.", "warning");
-  }
-
-  lastProviderState = {
-    ...providerDiagnostics(),
-    selectedAddress: address,
-    watchedAddress: WATCHED_ADDRESS,
-    addressMatchesWatchedAddress: Boolean(address && address === WATCHED_ADDRESS),
-    detectedNetwork: classification,
-    displayedNetwork: networkLabel(classification),
-    fullNode: endpoint || null,
-    expectedEndpoint: EXPECTED_ENDPOINT,
-    chainId,
-    normalizedChainId: normalizeChainId(chainId),
-    networkName: networkName || null,
-  };
-  renderDebug();
-}
-
-function hasConnectedWallet() {
-  return Boolean(
-    selectedAddress ||
-      window.tronWeb?.defaultAddress?.base58 ||
-      window.tron?.tronWeb?.defaultAddress?.base58,
-  );
-}
-
-async function connectWallet() {
+async function connectTronLink() {
   const tronProvider = await getTronProvider();
-  if (!tronProvider && hasConnectedWallet()) {
-    refreshWalletState();
-    return;
+  if (!tronProvider && hasConnectedTronWallet()) {
+    return getTronWalletState();
   }
   if (!tronProvider || typeof tronProvider.request !== "function") {
     throw new Error("TronLink provider not available");
@@ -278,22 +171,66 @@ async function connectWallet() {
   try {
     await tronProvider.request({ method: "eth_requestAccounts", params: [] });
   } catch (error) {
-    await legacyRequestAccounts(error);
+    await legacyTronRequestAccounts(error);
   }
   await waitForTronWebReady(tronProvider);
-  refreshWalletState();
+  return getTronWalletState();
 }
 
-function isUnsupportedSwitchError(error) {
+function detectTronNetwork(tw) {
+  const fullNode = tw?.fullNode?.host || "";
+  const chainId =
+    window.tron?.chainId ||
+    window.tron?.networkVersion ||
+    window.tronLink?.chainId ||
+    window.tronLink?.networkVersion ||
+    "";
+  const networkName = window.tron?.networkName || window.tronLink?.networkName || "";
+  const classification = classifyEndpoint(fullNode, chainId, networkName);
+  return {
+    family: "tron",
+    classification,
+    label: networkLabel(classification),
+    detail: networkDetail(classification),
+    fullNode,
+    chainId,
+    normalizedChainId: normalizeChainId(chainId),
+    networkName,
+  };
+}
+
+function getTronWalletState() {
+  const tronProvider = window.tron || window.tronLink || null;
+  const tw = getInjectedTronWeb(tronProvider);
+  selectedAddress =
+    tw?.defaultAddress?.base58 ||
+    window.tron?.selectedAddress ||
+    window.tronLink?.tronWeb?.defaultAddress?.base58 ||
+    null;
+  const network = detectTronNetwork(tw);
+  return {
+    mode: "tron",
+    providerDetected: Boolean(tronProvider || tw),
+    providerName: "TronLink",
+    address: selectedAddress,
+    connected: Boolean(selectedAddress),
+    endpoint: network.fullNode || "Unknown",
+    network,
+    providerTypes: {
+      windowTron: Boolean(window.tron),
+      windowTronRequestType: typeof window.tron?.request,
+      windowTronTronWebType: typeof window.tron?.tronWeb,
+      windowTronLink: Boolean(window.tronLink),
+      windowTronWeb: Boolean(window.tronWeb),
+      windowTronWebType: typeof window.tronWeb,
+    },
+  };
+}
+
+function isUnsupportedProviderError(error) {
   const code = error?.code;
   const message = String(error?.message || error || "");
   return code === 4200 || code === -32601 || /unknown method|unsupported method|method not found/i.test(message);
-}
-
-function isMissingChainError(error) {
-  const code = error?.code;
-  const message = String(error?.message || error || "");
-  return code === 4902 || /not added|not found|unrecognized chain|chain.*not/i.test(message);
 }
 
 function isExistingChainError(error) {
@@ -301,84 +238,189 @@ function isExistingChainError(error) {
   return /already|exist|duplicate|same chain|known chain|chain.*added/i.test(message);
 }
 
-function showManualInstructions() {
-  el.manualPanel.classList.remove("hidden");
+function showTronNetworkInfo() {
+  el.tronNetworkPanel.classList.remove("hidden");
+  el.evmConfigPanel.classList.add("hidden");
+  const state = getTronWalletState();
+  if (state.network.classification === "nile") {
+    setMessage("You are already on MyChain test mode using Nile endpoint.", "ok");
+  } else {
+    setMessage("MyChain TRON mode uses Nile endpoints for now. Use Try automatic switch only if needed.", "muted");
+  }
 }
 
-async function addMyChainNetwork(tronProvider) {
-  await tronProvider.request({
-    method: "wallet_addEthereumChain",
-    params: [MYCHAIN_PARAMS],
-  });
-}
-
-async function switchMyChain(tronProvider) {
-  await tronProvider.request({
-    method: "wallet_switchEthereumChain",
-    params: [{ chainId: NILE_CHAIN_ID_HEX }],
-  });
-}
-
-async function switchToMyChain() {
+async function addOrSwitchTronNetwork() {
   const tronProvider = await getTronProvider();
   if (!tronProvider || typeof tronProvider.request !== "function") {
+    showTronNetworkInfo();
     throw new Error("TronLink provider not available");
   }
+  if (!hasConnectedTronWallet()) await connectTronLink();
 
-  if (!selectedAddress) {
-    await connectWallet();
-  }
-
-  setMessage("Requesting TronLink to add MyChain...", "muted");
   try {
-    await addMyChainNetwork(tronProvider);
-    setMessage("MyChain add request sent. Confirm it in TronLink.", "muted");
+    await tronProvider.request({ method: "wallet_addEthereumChain", params: [MYCHAIN_TRON_PARAMS] });
   } catch (error) {
-    if (error?.code === 4001) {
-      throw new Error("Switch rejected by user.");
-    }
+    if (error?.code === 4001) throw new Error("Switch rejected by user.");
     if (isExistingChainError(error)) {
       setMessage("TronLink already has Nile Testnet for this chainId. Until a real private TRON node is running, MyChain uses Nile under the hood.", "warning");
-    } else if (isUnsupportedSwitchError(error)) {
-      showManualInstructions();
-      throw new Error("TronLink does not support programmatic add. Open the network selector and add MyChain manually.");
-    } else {
-      lastConnectionError = {
-        code: error?.code ?? null,
-        message: String(error?.message || error || "Unknown add network error"),
-        methodAttempted: "wallet_addEthereumChain",
-      };
-      setMessage("Could not add MyChain as a custom network. Trying to switch by chainId next.", "warning");
+    } else if (isUnsupportedProviderError(error)) {
+      showTronNetworkInfo();
+      throw new Error("TronLink does not support programmatic add. Add MyChain manually if available.");
     }
   }
 
-  setMessage("Requesting TronLink network switch...", "muted");
   try {
-    await switchMyChain(tronProvider);
-    setMessage("Switch request sent. Confirm it in TronLink.", "muted");
+    await tronProvider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: MYCHAIN_TRON_CHAIN_ID_HEX }],
+    });
   } catch (error) {
-    if (error?.code === 4001) {
-      throw new Error("Switch rejected by user.");
-    }
-    if (isMissingChainError(error)) {
-      showManualInstructions();
-      throw new Error("TronLink could not find this chainId. Add MyChain manually, then switch to it.");
-    }
-    if (isUnsupportedSwitchError(error)) {
-      showManualInstructions();
-      throw new Error("TronLink does not support programmatic switch. Open the network selector and choose MyChain or TRON Nile Testnet.");
+    if (error?.code === 4001) throw new Error("Switch rejected by user.");
+    if (isUnsupportedProviderError(error)) {
+      showTronNetworkInfo();
+      throw new Error("TronLink does not support programmatic switch. Select MyChain or TRON Nile Testnet manually.");
     }
     throw error;
   }
 
   await new Promise((resolve) => setTimeout(resolve, 800));
   refreshWalletState();
-  if (lastProviderState.detectedNetwork === "nile") {
-    setMessage("Switched to MyChain test mode.", "ok");
-  } else {
-    showManualInstructions();
-    setMessage("Switch request sent. If TronLink did not switch, choose MyChain or TRON Nile Testnet manually.", "warning");
+  setMessage(
+    latestWalletState.network?.classification === "nile"
+      ? "Switched to MyChain test mode."
+      : "Switch request sent. Confirm the network in TronLink.",
+    latestWalletState.network?.classification === "nile" ? "ok" : "warning",
+  );
+}
+
+function providerLabel(providerObject) {
+  if (!providerObject) return "Unknown";
+  if (providerObject.info?.name) return providerObject.info.name;
+  if (providerObject.isMetaMask) return "MetaMask";
+  if (providerObject.isTrust || providerObject.isTrustWallet) return "Trust Wallet";
+  if (providerObject.isRabby) return "Rabby";
+  if (providerObject.isCoinbaseWallet) return "Coinbase Wallet";
+  return "Unknown EIP-1193 wallet";
+}
+
+function rememberEip6963Provider(providerDetail) {
+  const providerObject = providerDetail?.provider;
+  if (!providerObject || evmProviders.some((item) => item.provider === providerObject)) return;
+  evmProviders.push({
+    provider: providerObject,
+    info: providerDetail.info || null,
+    label: providerDetail.info?.name || providerLabel(providerObject),
+  });
+  renderEvmProviderSelect();
+}
+
+function getEvmProviders() {
+  const providers = [...evmProviders];
+  if (window.ethereum && !providers.some((item) => item.provider === window.ethereum)) {
+    providers.unshift({ provider: window.ethereum, info: null, label: providerLabel(window.ethereum) });
   }
+  return providers;
+}
+
+function selectedEvmProvider() {
+  const providers = getEvmProviders();
+  return providers[selectedEvmProviderIndex]?.provider || providers[0]?.provider || null;
+}
+
+function renderEvmProviderSelect() {
+  const providers = getEvmProviders();
+  el.evmProviderSelect.innerHTML = providers
+    .map((item, index) => `<option value="${index}">${item.label}</option>`)
+    .join("");
+  el.evmProviderRow.classList.toggle("hidden", activeMode !== "evm" || providers.length <= 1);
+}
+
+function detectEvmNetwork(providerObject) {
+  const chainId = providerObject?.chainId || "";
+  return {
+    family: "evm",
+    classification: MYCHAIN_EVM_ENABLED && normalizeChainId(chainId) === MYCHAIN_EVM_CHAIN_ID_HEX ? "mychain-evm" : "unknown",
+    label: chainId ? `EVM ${normalizeChainId(chainId)}` : "Unknown",
+    detail: MYCHAIN_EVM_ENABLED ? "EVM RPC configured" : "MyChain EVM network is not configured yet",
+    chainId,
+    normalizedChainId: normalizeChainId(chainId),
+  };
+}
+
+async function getEvmWalletState() {
+  const evmProvider = selectedEvmProvider();
+  let accounts = [];
+  try {
+    accounts =
+      evmProvider && typeof evmProvider.request === "function"
+        ? await evmProvider.request({ method: "eth_accounts" })
+        : [];
+  } catch (_error) {
+    accounts = [];
+  }
+  let chainId = evmProvider?.chainId || "";
+  try {
+    chainId =
+      evmProvider && typeof evmProvider.request === "function"
+        ? await evmProvider.request({ method: "eth_chainId" })
+        : chainId;
+  } catch (_error) {
+    // Keep provider.chainId if request is unavailable.
+  }
+  if (evmProvider) evmProvider.chainId = chainId;
+  const network = detectEvmNetwork(evmProvider);
+  return {
+    mode: "evm",
+    providerDetected: Boolean(evmProvider),
+    providerName: providerLabel(evmProvider),
+    address: accounts[0] || null,
+    connected: Boolean(accounts[0]),
+    endpoint: MYCHAIN_EVM_RPC_URL || "No EVM RPC configured",
+    network,
+    flags: {
+      isMetaMask: Boolean(evmProvider?.isMetaMask),
+      isTrust: Boolean(evmProvider?.isTrust || evmProvider?.isTrustWallet),
+      isRabby: Boolean(evmProvider?.isRabby),
+      isCoinbaseWallet: Boolean(evmProvider?.isCoinbaseWallet),
+    },
+  };
+}
+
+async function connectEvmWallet() {
+  const evmProvider = selectedEvmProvider();
+  if (!evmProvider || typeof evmProvider.request !== "function") {
+    throw new Error("No EIP-1193 wallet provider detected");
+  }
+  await evmProvider.request({ method: "eth_requestAccounts" });
+  return getEvmWalletState();
+}
+
+async function addOrSwitchEvmNetwork() {
+  if (!MYCHAIN_EVM_ENABLED || !MYCHAIN_EVM_CHAIN_ID_HEX || !MYCHAIN_EVM_RPC_URL) {
+    el.evmConfigPanel.classList.remove("hidden");
+    el.tronNetworkPanel.classList.add("hidden");
+    setMessage("EVM mode is not configured yet. Provide MYCHAIN_EVM_RPC_URL and MYCHAIN_EVM_CHAIN_ID to enable MetaMask/Trust Wallet network switching.", "warning");
+    return;
+  }
+
+  const evmProvider = selectedEvmProvider();
+  if (!evmProvider || typeof evmProvider.request !== "function") {
+    throw new Error("No EIP-1193 wallet provider detected");
+  }
+  const params = {
+    chainId: MYCHAIN_EVM_CHAIN_ID_HEX,
+    chainName: MYCHAIN_EVM_CHAIN_NAME,
+    nativeCurrency: {
+      name: MYCHAIN_EVM_NATIVE_SYMBOL,
+      symbol: MYCHAIN_EVM_NATIVE_SYMBOL,
+      decimals: MYCHAIN_EVM_NATIVE_DECIMALS,
+    },
+    rpcUrls: [MYCHAIN_EVM_RPC_URL],
+  };
+  if (MYCHAIN_EVM_EXPLORER_URL) params.blockExplorerUrls = [MYCHAIN_EVM_EXPLORER_URL];
+  await evmProvider.request({ method: "wallet_addEthereumChain", params: [params] });
+  await evmProvider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: MYCHAIN_EVM_CHAIN_ID_HEX }] });
+  await refreshWalletState();
 }
 
 async function getJson(path) {
@@ -388,6 +430,14 @@ async function getJson(path) {
 }
 
 async function refreshBackend() {
+  if (activeMode === "evm") {
+    latestBackend = { mode: "evm", configured: false };
+    el.backendStatus.textContent = "Not configured";
+    el.backendBalance.textContent = "No EVM backend balance configured yet.";
+    renderDebug();
+    return;
+  }
+
   try {
     const [health, balance] = await Promise.all([
       getJson("/health"),
@@ -405,58 +455,105 @@ async function refreshBackend() {
   renderDebug();
 }
 
+function renderWalletState(state) {
+  latestWalletState = state;
+  el.providerLabel.textContent = activeMode === "tron" ? "TronLink" : "EVM wallet";
+  el.providerStatus.textContent = state.providerDetected ? state.providerName : "Not detected";
+  el.walletStatus.textContent = state.connected ? "Connected" : "Not connected";
+  el.networkStatus.textContent = state.network?.label || "Unknown";
+  el.walletAddress.textContent = state.address || "Not connected";
+  el.currentEndpoint.textContent = state.endpoint || "Unknown";
+  el.networkDetail.textContent = state.network?.detail || "Unknown";
+  el.watchedAddress.textContent = activeMode === "tron" ? MYCHAIN_TRON_WATCHED_ADDRESS : "No EVM watched address configured";
+  el.networkMode.textContent =
+    activeMode === "tron"
+      ? "MyChain test mode using Nile endpoints"
+      : MYCHAIN_EVM_ENABLED
+        ? MYCHAIN_EVM_CHAIN_NAME
+        : "EVM mode placeholder";
+  el.connectButton.textContent =
+    activeMode === "tron"
+      ? state.connected
+        ? "Wallet Connected"
+        : "Connect TronLink"
+      : state.connected
+        ? "EVM Wallet Connected"
+        : "Connect EVM Wallet";
+  el.connectButton.disabled = Boolean(state.connected);
+  el.networkButton.textContent = activeMode === "tron" ? "MyChain Network Info" : "Add / Switch EVM Network";
+}
+
+async function refreshWalletState() {
+  if (activeMode === "tron") {
+    renderWalletState(getTronWalletState());
+  } else {
+    renderWalletState(await getEvmWalletState());
+  }
+}
+
 async function refreshAll() {
+  renderMode();
   await refreshBackend();
-  refreshWalletState();
+  await refreshWalletState();
+  renderDebug();
+}
+
+function renderMode() {
+  el.tronModeButton.classList.toggle("active", activeMode === "tron");
+  el.evmModeButton.classList.toggle("active", activeMode === "evm");
+  renderEvmProviderSelect();
 }
 
 async function onConnectClick() {
   try {
-    if (hasConnectedWallet()) {
-      refreshWalletState();
-      setMessage("Wallet already connected.", "ok");
+    if (activeMode === "tron") {
+      if (hasConnectedTronWallet()) {
+        await refreshWalletState();
+        setMessage("Wallet already connected.", "ok");
+        return;
+      }
+      await connectTronLink();
+      await refreshWalletState();
+      setMessage("Wallet connected.", "ok");
       return;
     }
-    await connectWallet();
-    setMessage("Wallet connected.", "ok");
+    await connectEvmWallet();
+    await refreshWalletState();
+    setMessage(
+      MYCHAIN_EVM_ENABLED
+        ? "EVM wallet connected."
+        : "EVM wallet connected, but MyChain EVM network is not configured yet.",
+      MYCHAIN_EVM_ENABLED ? "ok" : "warning",
+    );
   } catch (error) {
-    setMessage(formatConnectionError(error, "eth_requestAccounts"), "error");
+    lastConnectionError = { message: String(error?.message || error), mode: activeMode };
+    setMessage(String(error?.message || error), "error");
     renderDebug();
   }
 }
 
-function onNetworkInfoClick() {
-  showManualInstructions();
-  refreshWalletState();
-  if (lastProviderState.detectedNetwork === "nile") {
-    setMessage("You are already on MyChain test mode using Nile endpoint.", "ok");
-  } else {
-    setMessage("MyChain network details are shown below. Use Try automatic switch only if you want TronLink to attempt it.", "muted");
-  }
-}
-
-async function onTrySwitchClick() {
+async function onNetworkClick() {
   try {
-    await switchToMyChain();
+    if (activeMode === "tron") {
+      showTronNetworkInfo();
+    } else {
+      await addOrSwitchEvmNetwork();
+    }
   } catch (error) {
-    const message = String(error?.message || error || "Network switch failed");
-    setMessage(message, message.includes("rejected") ? "warning" : "error");
+    lastConnectionError = { message: String(error?.message || error), mode: activeMode };
+    setMessage(String(error?.message || error), "error");
     renderDebug();
   }
 }
 
-function renderDebug() {
-  el.debugOutput.textContent = JSON.stringify(
-    {
-      backend: latestBackend,
-      providerState: lastProviderState,
-      lastConnectionError,
-      chainIdConfiguredForProgrammaticSwitch: Boolean(NILE_CHAIN_ID_HEX),
-      myChainNetworkParams: MYCHAIN_PARAMS,
-    },
-    null,
-    2,
-  );
+async function onTryTronSwitchClick() {
+  try {
+    await addOrSwitchTronNetwork();
+  } catch (error) {
+    lastConnectionError = { message: String(error?.message || error), mode: "tron" };
+    setMessage(String(error?.message || error), "error");
+    renderDebug();
+  }
 }
 
 async function copyText(text, label) {
@@ -476,40 +573,96 @@ async function copyText(text, label) {
   setMessage(`${label} copied.`, "ok");
 }
 
-function allConfigText() {
+function tronConfigText() {
   return [
     "Network name: MyChain",
-    `Chain ID: ${NILE_CHAIN_ID_HEX}`,
-    `FullNode: ${EXPECTED_ENDPOINT}`,
-    `SolidityNode: ${EXPECTED_ENDPOINT}`,
-    `EventServer: ${EXPECTED_ENDPOINT}`,
+    `Chain ID: ${MYCHAIN_TRON_CHAIN_ID_HEX}`,
+    `FullNode: ${MYCHAIN_TRON_EXPECTED_ENDPOINT}`,
+    `SolidityNode: ${MYCHAIN_TRON_EXPECTED_ENDPOINT}`,
+    `EventServer: ${MYCHAIN_TRON_EXPECTED_ENDPOINT}`,
     "Explorer: https://nile.tronscan.org",
   ].join("\n");
 }
 
+function renderDebug() {
+  el.debugOutput.textContent = JSON.stringify(
+    {
+      activeMode,
+      tronConfig: {
+        modeName: MYCHAIN_TRON_MODE_NAME,
+        expectedEndpoint: MYCHAIN_TRON_EXPECTED_ENDPOINT,
+        chainId: MYCHAIN_TRON_CHAIN_ID_HEX,
+        usdtContract: MYCHAIN_TRON_USDT_CONTRACT,
+        watchedAddress: MYCHAIN_TRON_WATCHED_ADDRESS,
+      },
+      evmConfig: {
+        enabled: MYCHAIN_EVM_ENABLED,
+        chainName: MYCHAIN_EVM_CHAIN_NAME,
+        chainId: MYCHAIN_EVM_CHAIN_ID_HEX,
+        rpcConfigured: Boolean(MYCHAIN_EVM_RPC_URL),
+        explorerConfigured: Boolean(MYCHAIN_EVM_EXPLORER_URL),
+      },
+      evmProviders: getEvmProviders().map((item) => ({
+        label: item.label,
+        flags: {
+          isMetaMask: Boolean(item.provider?.isMetaMask),
+          isTrust: Boolean(item.provider?.isTrust || item.provider?.isTrustWallet),
+          isRabby: Boolean(item.provider?.isRabby),
+          isCoinbaseWallet: Boolean(item.provider?.isCoinbaseWallet),
+        },
+      })),
+      walletState: latestWalletState,
+      backend: latestBackend,
+      lastConnectionError,
+    },
+    null,
+    2,
+  );
+}
+
+function setMode(mode) {
+  activeMode = mode;
+  el.tronNetworkPanel.classList.add("hidden");
+  el.evmConfigPanel.classList.add("hidden");
+  setMessage(
+    mode === "tron"
+      ? "TRON mode selected. TronLink/Nile-backed MyChain test mode is available now."
+      : "EVM mode selected. Wallet connection can be tested, but MyChain EVM RPC is not configured yet.",
+    mode === "tron" ? "muted" : "warning",
+  );
+  refreshAll();
+}
+
 function attachEvents() {
+  el.tronModeButton.addEventListener("click", () => setMode("tron"));
+  el.evmModeButton.addEventListener("click", () => setMode("evm"));
   el.connectButton.addEventListener("click", onConnectClick);
-  el.networkButton.addEventListener("click", onNetworkInfoClick);
+  el.networkButton.addEventListener("click", onNetworkClick);
   el.refreshButton.addEventListener("click", refreshAll);
-  el.copyFullNodeButton.addEventListener("click", () => copyText(EXPECTED_ENDPOINT, "FullNode"));
-  el.copyAllConfigButton.addEventListener("click", () => copyText(allConfigText(), "MyChain config"));
-  el.trySwitchButton.addEventListener("click", onTrySwitchClick);
+  el.copyTronFullNodeButton.addEventListener("click", () => copyText(MYCHAIN_TRON_EXPECTED_ENDPOINT, "FullNode"));
+  el.copyTronConfigButton.addEventListener("click", () => copyText(tronConfigText(), "MyChain config"));
+  el.tryTronSwitchButton.addEventListener("click", onTryTronSwitchClick);
+  el.evmProviderSelect.addEventListener("change", (event) => {
+    selectedEvmProviderIndex = Number(event.target.value || 0);
+    refreshAll();
+  });
 
   const tron = window.tron;
   if (tron?.on) {
     tron.on("accountsChanged", refreshAll);
     tron.on("chainChanged", refreshAll);
   }
-
   window.addEventListener("message", (event) => {
     const message = event.data?.message;
-    if (message?.action === "accountsChanged" || message?.action === "setNode") {
-      refreshAll();
-    }
+    if (message?.action === "accountsChanged" || message?.action === "setNode") refreshAll();
   });
+  window.addEventListener("eip6963:announceProvider", (event) => {
+    rememberEip6963Provider(event.detail);
+    if (activeMode === "evm") refreshAll();
+  });
+  window.dispatchEvent(new Event("eip6963:requestProvider"));
 }
 
-el.watchedAddress.textContent = WATCHED_ADDRESS;
 attachEvents();
 refreshAll();
 setInterval(refreshAll, 15000);
