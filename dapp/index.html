@@ -69,6 +69,7 @@
           <p>195.200.14.38:8790 is the dApp URL, not a blockchain RPC.</p>
           <p>127.0.0.1:8787 is the internal watcher/ledger backend, not a blockchain RPC.</p>
           <p>MyChain EVM test RPC is running at http://195.200.14.38:8545.</p>
+          <p>195.200.14.38:8545 is EVM/Anvil RPC. It is for MetaMask-compatible wallets, not TronLink.</p>
           <p>MyChain TRON/private-chain infrastructure is not deployed yet.</p>
           <h3>Planned MyChain network config</h3>
           <div class="planned-config">
@@ -89,6 +90,9 @@
         <section id="tronNetworkPanel" class="manual hidden">
           <h2>Nile Testnet wallet status</h2>
           <p>The connected wallet is on Nile Testnet. This supports the current backend watcher test, but it is not MyChain on-chain infrastructure.</p>
+          <p>TRON mode works only with TRON-compatible networks such as Nile or a real TRON private FullNode. Do not use the MyChain EVM RPC here.</p>
+          <p>Correct Nile endpoint: <code>https://nile.trongrid.io</code></p>
+          <p>Wrong for TronLink: <code>http://195.200.14.38:8545</code></p>
           <ol>
             <li>Open TronLink network selector.</li>
             <li>Select TRON Nile Testnet for watcher testing.</li>
@@ -100,6 +104,7 @@
         <section id="evmConfigPanel" class="manual hidden">
           <h2>MyChain EVM mode</h2>
           <p>MyChain EVM RPC is configured for wallet network testing.</p>
+          <p>Use this only in MetaMask, Trust Wallet EVM mode, TokenPocket EVM, Rabby, or another EIP-1193 wallet.</p>
           <div class="planned-config">
             <span>Network name: MyChain EVM</span>
             <span>RPC URL: http://195.200.14.38:8545</span>

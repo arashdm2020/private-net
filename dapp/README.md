@@ -46,6 +46,9 @@ TRON / TronLink mode works now:
 - Treats injected `tronWeb` as an object/property, not as a function.
 - Shows backend indexed Nile balance for `test_account_001`.
 - Shows the wallet network as Nile Testnet when the endpoint is `https://nile.trongrid.io`.
+- TRON mode works only with TRON-compatible networks such as Nile or a real TRON private FullNode.
+- Do not use `http://195.200.14.38:8545` in TronLink. That is EVM/Anvil RPC, not a TRON FullNode/EventServer.
+- If TronLink is pointed at `195.200.14.38:8545`, the UI shows an invalid-network warning.
 
 EVM / MetaMask-compatible mode is enabled for wallet network testing:
 
@@ -54,6 +57,7 @@ EVM / MetaMask-compatible mode is enabled for wallet network testing:
 - Shows provider flags for MetaMask, Trust Wallet, Rabby, and Coinbase Wallet in Advanced debug.
 - Allows basic EVM wallet connection when an injected provider exists.
 - Uses `wallet_addEthereumChain` and `wallet_switchEthereumChain` with the public MyChain EVM RPC.
+- Use `http://195.200.14.38:8545` only in MetaMask, Trust Wallet EVM mode, TokenPocket EVM, Rabby, or another EIP-1193 wallet.
 
 EVM placeholders:
 

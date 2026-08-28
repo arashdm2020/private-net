@@ -6,6 +6,7 @@ const NILE_EXPECTED_ENDPOINT = "https://nile.trongrid.io";
 const MYCHAIN_TRON_CHAIN_ID_HEX = "0xcd8690dc";
 const MYCHAIN_TRON_USDT_CONTRACT = "TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf";
 const MYCHAIN_TRON_WATCHED_ADDRESS = "TFP84nTasN6G3M7SxX1XmRUP5wrX2ZeoYt";
+const MYCHAIN_EVM_RPC_HOST = "195.200.14.38:8545";
 
 const MYCHAIN_EVM_ENABLED = true;
 const MYCHAIN_EVM_CHAIN_NAME = "MyChain EVM";
@@ -63,8 +64,9 @@ function normalizeChainId(value) {
 }
 
 function classifyEndpoint(endpoint, chainId = "", networkName = "") {
-  if (normalizeChainId(chainId) === MYCHAIN_TRON_CHAIN_ID_HEX) return "nile";
   const value = [endpoint, networkName].map((item) => String(item || "").toLowerCase()).join(" ");
+  if (value.includes(MYCHAIN_EVM_RPC_HOST)) return "evm-rpc-in-tron";
+  if (normalizeChainId(chainId) === MYCHAIN_TRON_CHAIN_ID_HEX) return "nile";
   if (!value.trim()) return "unknown";
   if (value.includes("nile")) return "nile";
   if (value.includes("shasta")) return "shasta";
@@ -74,6 +76,7 @@ function classifyEndpoint(endpoint, chainId = "", networkName = "") {
 
 function networkLabel(classification) {
   if (classification === "nile") return "Nile Testnet";
+  if (classification === "evm-rpc-in-tron") return "Invalid TRON network";
   if (classification === "mainnet") return "Mainnet";
   if (classification === "shasta") return "Shasta";
   return "Unknown";
@@ -81,6 +84,7 @@ function networkLabel(classification) {
 
 function networkDetail(classification) {
   if (classification === "nile") return "Connected to Nile endpoint";
+  if (classification === "evm-rpc-in-tron") return "EVM/Anvil RPC is configured inside TronLink";
   if (classification === "mainnet") return "Wrong network for this test";
   if (classification === "shasta") return "Wrong test network for this test";
   return "Could not confirm network";
@@ -236,6 +240,8 @@ function showTronNetworkInfo() {
   const state = getTronWalletState();
   if (state.network.classification === "nile") {
     setMessage("Wallet is on Nile Testnet. Backend watcher test mode is active.", "ok");
+  } else if (state.network.classification === "evm-rpc-in-tron") {
+    setMessage("You are using an EVM RPC inside TronLink. This is not a valid TRON network. Remove this custom TRON network from TronLink and use Nile for TRON mode, or switch to EVM mode with MetaMask-compatible wallet.", "error");
   } else {
     setMessage("For current watcher testing, switch TronLink to TRON Nile Testnet manually.", "muted");
   }
@@ -434,7 +440,11 @@ function renderWalletState(state) {
 
 async function refreshWalletState() {
   if (activeMode === "tron") {
-    renderWalletState(getTronWalletState());
+    const state = getTronWalletState();
+    renderWalletState(state);
+    if (state.network?.classification === "evm-rpc-in-tron") {
+      setMessage("You are using an EVM RPC inside TronLink. This is not a valid TRON network. Remove this custom TRON network from TronLink and use Nile for TRON mode, or switch to EVM mode with MetaMask-compatible wallet.", "error");
+    }
   } else {
     renderWalletState(await getEvmWalletState());
   }
@@ -522,6 +532,7 @@ function renderDebug() {
       tronConfig: {
         modeName: TRON_WATCHER_MODE_NAME,
         expectedNileEndpoint: NILE_EXPECTED_ENDPOINT,
+        wrongForTronLink: `http://${MYCHAIN_EVM_RPC_HOST}`,
         chainId: MYCHAIN_TRON_CHAIN_ID_HEX,
         usdtContract: MYCHAIN_TRON_USDT_CONTRACT,
         watchedAddress: MYCHAIN_TRON_WATCHED_ADDRESS,
