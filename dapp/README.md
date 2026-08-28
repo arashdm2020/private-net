@@ -34,6 +34,16 @@ The dashboard shows:
 - Manual backend actions for polling and idempotent crediting.
 - Collapsible raw JSON debug output.
 
+## TronLink Connect Flow
+
+The dApp prefers the modern provider at `window.tron` and connects with:
+
+```text
+eth_requestAccounts
+```
+
+`tron_requestAccounts` is kept only as a legacy fallback when the provider clearly reports that `eth_requestAccounts` is unsupported or unknown. User rejection is not retried with a fallback.
+
 ## TronLink Notes
 
 `NILE_CHAIN_ID_HEX` is intentionally empty in `app.js`. Do not guess it silently. If programmatic switching is unavailable, use the manual flow:

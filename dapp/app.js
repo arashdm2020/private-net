@@ -11,6 +11,7 @@ let selectedAddress = null;
 let latestBackend = {};
 let latestWallet = {};
 let lastProviderState = {};
+let lastConnectionError = null;
 
 const el = {
   connectButton: document.getElementById("connectButton"),
@@ -56,7 +57,7 @@ function provider() {
 }
 
 function tronWeb() {
-  return window.tronWeb || window.tronLink?.tronWeb || null;
+  return window.tron?.tronWeb || window.tronWeb || window.tronLink?.tronWeb || null;
 }
 
 function escapeHtml(value) {
@@ -88,6 +89,57 @@ function setStatus(node, text, kind) {
   node.className = `status ${kind}`;
 }
 
+function providerDiagnostics(methodAttempted = "") {
+  return {
+    methodAttempted,
+    windowTron: Boolean(window.tron),
+    windowTronRequest: typeof window.tron?.request === "function",
+    windowTronTronWeb: Boolean(window.tron?.tronWeb),
+    windowTronLink: Boolean(window.tronLink),
+    windowTronLinkRequest: typeof window.tronLink?.request === "function",
+    windowTronWeb: Boolean(window.tronWeb),
+    windowTronWebRequest: typeof window.tronWeb?.request === "function",
+  };
+}
+
+function errorDetails(error, methodAttempted) {
+  return {
+    code: error?.code ?? null,
+    message: String(error?.message || error || "Unknown error"),
+    ...providerDiagnostics(methodAttempted),
+  };
+}
+
+function formatConnectionError(error, methodAttempted) {
+  const details = errorDetails(error, methodAttempted);
+  lastConnectionError = details;
+  const code = details.code === null ? "none" : details.code;
+  return [
+    `Connect failed: ${details.message}`,
+    `code=${code}`,
+    `method=${details.methodAttempted || "unknown"}`,
+    `window.tron=${details.windowTron ? "yes" : "no"}`,
+    `window.tron.request=${details.windowTronRequest ? "yes" : "no"}`,
+    `window.tron.tronWeb=${details.windowTronTronWeb ? "yes" : "no"}`,
+    `window.tronLink=${details.windowTronLink ? "yes" : "no"}`,
+    `window.tronWeb=${details.windowTronWeb ? "yes" : "no"}`,
+  ].join(" | ");
+}
+
+async function getTronProvider() {
+  const started = Date.now();
+  while (Date.now() - started < 2000) {
+    if (window.tron && typeof window.tron.request === "function") {
+      return window.tron;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  if (window.tronLink && typeof window.tronLink.request === "function") {
+    return window.tronLink;
+  }
+  return null;
+}
+
 async function getJson(path) {
   const response = await fetch(`${BACKEND_API_BASE}${path}`, { cache: "no-store" });
   if (!response.ok) throw new Error(`${path} returned ${response.status}`);
@@ -113,6 +165,7 @@ async function postJson(path, body = undefined) {
 function readAddress() {
   const tw = tronWeb();
   selectedAddress =
+    window.tron?.tronWeb?.defaultAddress?.base58 ||
     tw?.defaultAddress?.base58 ||
     window.tron?.selectedAddress ||
     window.tronLink?.tronWeb?.defaultAddress?.base58 ||
@@ -122,23 +175,64 @@ function readAddress() {
   return selectedAddress;
 }
 
-async function requestAccounts() {
-  const tron = window.tron;
+async function legacyRequestAccounts(errorFromPrimary) {
+  const code = errorFromPrimary?.code;
+  const msg = String(errorFromPrimary?.message || errorFromPrimary || "");
+  if (code === 4001) {
+    throw new Error("User rejected TronLink connection");
+  }
+  if (!(code === 4200 || /unknown method|unsupported method|method not found/i.test(msg))) {
+    throw errorFromPrimary;
+  }
+
+  const legacyParams = {
+    websiteName: "Nile Bridge dApp",
+    websiteIcon: window.location.origin + "/favicon.ico",
+  };
+  if (window.tronWeb && typeof window.tronWeb.request === "function") {
+    const legacyResult = await window.tronWeb.request({
+      method: "tron_requestAccounts",
+      params: legacyParams,
+    });
+    return legacyResult?.code === 200 ? [window.tronWeb.defaultAddress?.base58].filter(Boolean) : legacyResult;
+  }
+  if (window.tronLink && typeof window.tronLink.request === "function") {
+    const legacyResult = await window.tronLink.request({
+      method: "tron_requestAccounts",
+      params: legacyParams,
+    });
+    return legacyResult?.code === 200 ? [window.tronWeb?.defaultAddress?.base58].filter(Boolean) : legacyResult;
+  }
+  throw new Error("TronLink does not support eth_requestAccounts and no legacy fallback is available");
+}
+
+async function connectWallet() {
+  const tronProvider = await getTronProvider();
+  if (!tronProvider || typeof tronProvider.request !== "function") {
+    throw new Error("TronLink provider not available");
+  }
+
+  let accounts;
   try {
-    if (tron?.request) {
-      await tron.request({
-        method: "tron_requestAccounts",
-        params: {
-          websiteName: "Nile Bridge Test",
-          websiteIcon: window.location.origin + "/favicon.ico",
-        },
-      });
-    } else if (window.tronLink?.request) {
-      await window.tronLink.request({ method: "tron_requestAccounts" });
-    }
-    await refreshAll();
+    accounts = await tronProvider.request({
+      method: "eth_requestAccounts",
+      params: [],
+    });
   } catch (error) {
-    setStatus(el.actionResult, `Connect failed: ${error.message}`, "error");
+    accounts = await legacyRequestAccounts(error);
+  }
+  await refreshWallet();
+  await refreshAll();
+  return accounts;
+}
+
+async function requestAccounts() {
+  try {
+    await connectWallet();
+    setStatus(el.actionResult, "TronLink connected with eth_requestAccounts.", "ok");
+  } catch (error) {
+    setStatus(el.actionResult, formatConnectionError(error, "eth_requestAccounts"), "error");
+    renderDebug();
   }
 }
 
@@ -164,8 +258,11 @@ function snapshotProviderState() {
   const network = detectNetwork();
   lastProviderState = {
     tronDetected: Boolean(window.tron),
+    tronRequestDetected: typeof window.tron?.request === "function",
     tronLinkDetected: Boolean(window.tronLink),
+    tronLinkRequestDetected: typeof window.tronLink?.request === "function",
     tronWebDetected: Boolean(tw),
+    tronWebRequestDetected: typeof window.tronWeb?.request === "function",
     selectedAddress,
     defaultAddress: tw?.defaultAddress || null,
     network,
@@ -390,6 +487,7 @@ function renderDebug() {
       accountBalance: latestBackend.accountBalance || null,
       deposits: latestBackend.deposits || null,
       tronLinkProviderState: lastProviderState,
+      lastConnectionError,
       walletReadErrors: latestWallet.errors || {},
     },
     null,
