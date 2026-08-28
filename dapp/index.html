@@ -3,185 +3,72 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Nile Bridge dApp</title>
+    <title>MyChain Bridge dApp</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main>
-      <header class="topbar">
-        <div>
-          <h1>Nile Bridge dApp</h1>
-          <p>Read-only TronLink dashboard for the local Nile watcher and ledger.</p>
-        </div>
-        <div class="actions">
-          <button id="connectButton">Connect TronLink</button>
-          <button id="refreshButton" class="secondary">Refresh All</button>
-        </div>
+    <main class="shell">
+      <header class="hero">
+        <h1>MyChain Bridge dApp</h1>
+        <p>Connect your TronLink wallet and switch to the test network.</p>
       </header>
 
-      <section class="action-row">
-        <button id="pollButton">Poll Nile Now</button>
-        <button id="creditButton" class="secondary">Credit Detected Deposits</button>
-        <input id="adminTokenInput" type="password" placeholder="Admin token for /api/internal/*" autocomplete="off" />
-        <button id="saveTokenButton" class="secondary">Use Token</button>
-        <span id="actionResult" class="status muted">No action run yet</span>
-      </section>
-
-      <section id="networkWarning" class="notice warning">
-        <div>
-          <strong id="networkWarningTitle">Wallet is not confirmed on Nile Testnet.</strong>
-          <span id="networkWarningText">Programmatic switching is disabled until the Nile chainId is confirmed.</span>
+      <section class="connect-card">
+        <div class="status-list">
+          <div>
+            <span>TronLink</span>
+            <strong id="tronLinkStatus">Checking...</strong>
+          </div>
+          <div>
+            <span>Wallet</span>
+            <strong id="walletStatus">Not connected</strong>
+          </div>
+          <div>
+            <span>Network</span>
+            <strong id="networkStatus">Unknown</strong>
+          </div>
         </div>
-        <button id="switchButton">How to switch to Nile</button>
-      </section>
 
-      <section id="manualSwitchPanel" class="notice pending hidden">
-        <div>
-          <strong>Manual TronLink Nile switch</strong>
-          <ol class="compact-list">
+        <div class="actions">
+          <button id="connectButton">Connect TronLink</button>
+          <button id="networkButton" class="secondary">Add / Switch Network</button>
+        </div>
+
+        <p id="message" class="message muted">Ready.</p>
+
+        <dl class="details">
+          <dt>Selected wallet</dt>
+          <dd id="walletAddress">Not connected</dd>
+          <dt>Current endpoint</dt>
+          <dd id="currentEndpoint">Unknown</dd>
+          <dt>Watched MyChain address</dt>
+          <dd id="watchedAddress">TFP84nTasN6G3M7SxX1XmRUP5wrX2ZeoYt</dd>
+          <dt>Backend</dt>
+          <dd id="backendStatus">Checking...</dd>
+          <dt>Backend indexed balance</dt>
+          <dd id="backendBalance">Loading...</dd>
+        </dl>
+
+        <section id="manualPanel" class="manual hidden">
+          <h2>Add / Switch Network</h2>
+          <ol>
             <li>Open TronLink.</li>
-            <li>Open the network selector.</li>
-            <li>Select Nile Testnet.</li>
-            <li>If Nile is not listed, add or select the Nile testnet custom node if TronLink supports it.</li>
-            <li>Return to this dApp.</li>
-            <li>Click Refresh All.</li>
+            <li>Go to network selector.</li>
+            <li>Select MyChain Testnet.</li>
+            <li>Return to this page.</li>
+            <li>Click Refresh.</li>
           </ol>
-          <span>Expected Nile fullNode: https://nile.trongrid.io</span>
-          <span>Current fullNode: <code id="manualCurrentFullNode">Unavailable</code></span>
-        </div>
-      </section>
-
-      <section id="walletMatchNotice" class="notice muted">
-        <strong>Wallet match status unavailable.</strong>
-        <span>Connect TronLink to compare the selected wallet with the watched backend address.</span>
-      </section>
-
-      <section class="grid">
-        <article class="card">
-          <span class="label">TronLink</span>
-          <strong id="tronLinkStatus">Checking...</strong>
-          <small id="walletConnectedState">Wallet not connected</small>
-        </article>
-        <article class="card">
-          <span class="label">Selected Wallet</span>
-          <strong id="walletAddress">Not connected</strong>
-          <small id="walletMatchShort">Match unknown</small>
-        </article>
-        <article class="card">
-          <span class="label">Current Network</span>
-          <strong id="currentNetwork">Unknown</strong>
-          <small id="networkStatus">Network status unknown</small>
-          <small id="chainId">chainId unavailable</small>
-        </article>
-        <article class="card">
-          <span class="label">Target Network</span>
-          <strong>Nile Testnet</strong>
-          <small>Manual switch required until chainId is confirmed</small>
-        </article>
-        <article class="card wide">
-          <span class="label">Node Endpoints</span>
-          <dl class="node-list">
-            <dt>fullNode</dt>
-            <dd id="fullNodeHost">Unavailable</dd>
-            <dt>solidityNode</dt>
-            <dd id="solidityNodeHost">Unavailable</dd>
-            <dt>eventServer</dt>
-            <dd id="eventServerHost">Unavailable</dd>
-          </dl>
-        </article>
-        <article class="card">
-          <span class="label">Nile USDT Contract</span>
-          <strong id="usdtContract"></strong>
-        </article>
-        <article class="card">
-          <span class="label">Backend Indexed Nile Global USDT</span>
-          <strong id="backendGlobalBalance">Loading...</strong>
-          <small id="backendHealth">Backend: checking</small>
-        </article>
-        <article class="card">
-          <span class="label">Backend Indexed Nile Account USDT</span>
-          <strong id="backendAccountBalance">Loading...</strong>
-          <small>test_account_001</small>
-        </article>
-        <article class="card">
-          <span class="label">Wallet TRX Balance</span>
-          <strong id="walletTrx">Unavailable</strong>
-          <small id="walletTrxBase">base units unavailable</small>
-        </article>
-        <article class="card">
-          <span class="label">Wallet USDT Balance</span>
-          <strong id="walletUsdt">Unavailable</strong>
-          <small id="walletUsdtBase">base units unavailable</small>
-        </article>
-      </section>
-
-      <section class="panel comparison">
-        <div class="panel-header">
-          <h2>Wallet / Backend Comparison</h2>
-          <span id="comparisonState" class="status muted">Waiting for wallet</span>
-        </div>
-        <div class="comparison-grid">
-          <div><span>Connected wallet</span><strong id="compareWallet">Not connected</strong></div>
-          <div><span>Watched backend address</span><strong id="compareWatched">Loading...</strong></div>
-          <div><span>Wallet-side USDT</span><strong id="compareWalletUsdt">Unavailable</strong></div>
-          <div><span>Backend account USDT</span><strong id="compareAccountUsdt">Loading...</strong></div>
-          <div><span>Backend global USDT</span><strong id="compareGlobalUsdt">Loading...</strong></div>
-        </div>
-      </section>
-
-      <section class="panel manual">
-        <div class="panel-header">
-          <h2>Switch TronLink to Nile manually</h2>
-          <span class="status pending">Programmatic switch disabled</span>
-        </div>
-        <ol>
-          <li>Open TronLink.</li>
-          <li>Open the network selector.</li>
-          <li>Select Nile Testnet.</li>
-          <li>If Nile is not listed, add or select the Nile testnet custom node if TronLink supports it.</li>
-          <li>Return to this dApp.</li>
-          <li>Click Refresh All.</li>
-        </ol>
-        <div class="manual-endpoints">
-          <span>Expected Nile fullNode</span>
-          <strong>https://nile.trongrid.io</strong>
-          <span>Current fullNode</span>
-          <strong id="manualCurrentFullNodeSecondary">Unavailable</strong>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-header">
-          <h2>Recent Indexed Deposits</h2>
-          <span id="depositSummary" class="status muted">Loading</span>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Tx</th>
-                <th>Asset</th>
-                <th>Human</th>
-                <th>Base Units</th>
-                <th>From</th>
-                <th>To</th>
-                <th>Status</th>
-                <th>Account</th>
-                <th>Ledger</th>
-                <th>Detected</th>
-                <th>Confirmed</th>
-              </tr>
-            </thead>
-            <tbody id="deposits"></tbody>
-          </table>
-        </div>
+          <p>Expected MyChain endpoint: <code>https://nile.trongrid.io</code></p>
+          <p>Current endpoint: <code id="manualCurrentEndpoint">Unknown</code></p>
+        </section>
       </section>
 
       <details class="debug">
-        <summary>Debug JSON</summary>
+        <summary>Advanced debug</summary>
         <pre id="debugOutput">{}</pre>
       </details>
     </main>
+
     <script src="/app.js"></script>
   </body>
 </html>
