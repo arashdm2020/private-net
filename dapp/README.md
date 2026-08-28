@@ -18,8 +18,9 @@ The page intentionally shows only:
 - TronLink detected/not detected.
 - Wallet connected/not connected.
 - Network classification: MyChain, Mainnet, Shasta, or Unknown.
-- Connect TronLink button.
-- Add / Switch to MyChain button.
+- Connect TronLink button, which changes to `Wallet Connected` when an injected address is available.
+- MyChain Network Info button.
+- Refresh button.
 - Watched address.
 - Backend online/offline and indexed account balance.
 - Collapsed Advanced debug details.
@@ -32,7 +33,11 @@ The dApp uses `eth_requestAccounts` as the primary connection method. `tron_requ
 
 The injected `tronWeb` value is treated as an object/property, not as a function.
 
-Programmatic network setup first asks TronLink to add a custom network:
+The main MyChain button does not pretend a custom network can always be added programmatically. It opens compact setup information and copy buttons.
+
+MyChain is currently test mode backed by Nile endpoints. It is not a private TRON full node yet.
+
+The optional `Try automatic switch` action asks TronLink to add a custom network:
 
 ```text
 chainName: MyChain
@@ -47,7 +52,7 @@ Then it asks TronLink to switch with:
 0xcd8690dc
 ```
 
-If TronLink refuses because that chainId already exists as Nile Testnet, the UI explains that MyChain uses Nile-compatible endpoints until a real private TRON node exists. If programmatic add/switch is unsupported, the page shows manual setup instructions. The expected endpoint is:
+If TronLink refuses because that chainId already exists as Nile Testnet, the UI explains that MyChain uses Nile-compatible endpoints until a real private TRON node exists. If programmatic add/switch is unsupported, the page shows manual setup instructions and copyable config. The expected endpoint is:
 
 ```text
 https://nile.trongrid.io

@@ -25,11 +25,15 @@ const el = {
   connectButton: document.getElementById("connectButton"),
   networkButton: document.getElementById("networkButton"),
   refreshButton: document.getElementById("refreshButton"),
+  copyFullNodeButton: document.getElementById("copyFullNodeButton"),
+  copyAllConfigButton: document.getElementById("copyAllConfigButton"),
+  trySwitchButton: document.getElementById("trySwitchButton"),
   tronLinkStatus: document.getElementById("tronLinkStatus"),
   walletStatus: document.getElementById("walletStatus"),
   networkStatus: document.getElementById("networkStatus"),
   walletAddress: document.getElementById("walletAddress"),
   currentEndpoint: document.getElementById("currentEndpoint"),
+  networkDetail: document.getElementById("networkDetail"),
   watchedAddress: document.getElementById("watchedAddress"),
   backendStatus: document.getElementById("backendStatus"),
   backendBalance: document.getElementById("backendBalance"),
@@ -99,10 +103,17 @@ function classifyNetwork(endpoint, chainId = null, networkName = "") {
 }
 
 function networkLabel(classification) {
-  if (classification === "nile") return "MyChain";
+  if (classification === "nile") return "MyChain test mode";
   if (classification === "mainnet") return "Mainnet";
   if (classification === "shasta") return "Shasta";
   return "Unknown";
+}
+
+function networkDetail(classification) {
+  if (classification === "nile") return "Connected to Nile endpoint";
+  if (classification === "mainnet") return "Wrong network for this test";
+  if (classification === "shasta") return "Wrong test network for this test";
+  return "Could not confirm network";
 }
 
 function providerDiagnostics(methodAttempted = "") {
@@ -118,6 +129,11 @@ function providerDiagnostics(methodAttempted = "") {
     windowTronWebType: typeof window.tronWeb,
     providerTronWebType: typeof activeProvider?.tronWeb,
   };
+}
+
+function isTronLinkMobile() {
+  const userAgent = navigator.userAgent || "";
+  return Boolean(window.tronLink || window.tronWeb) && /mobile|android|iphone|ipad|ipod/i.test(userAgent);
 }
 
 function formatConnectionError(error, methodAttempted) {
@@ -140,6 +156,9 @@ async function getTronProvider() {
   }
   if (window.tronLink && typeof window.tronLink.request === "function") {
     return window.tronLink;
+  }
+  if (window.tronWeb && typeof window.tronWeb.request === "function") {
+    return window.tronWeb;
   }
   return null;
 }
@@ -203,12 +222,20 @@ function refreshWalletState() {
   el.networkStatus.textContent = networkLabel(classification);
   el.walletAddress.textContent = address || "Not connected";
   el.currentEndpoint.textContent = endpoint || "Unknown";
+  el.networkDetail.textContent = networkDetail(classification);
   el.manualCurrentEndpoint.textContent = endpoint || "Unknown";
+  el.connectButton.textContent = address ? "Wallet Connected" : "Connect TronLink";
+  el.connectButton.disabled = Boolean(address);
 
   if (!address) {
-    setMessage("Connect TronLink to continue.", "muted");
+    setMessage(
+      isTronLinkMobile()
+        ? "TronLink mobile detected. If no popup appears, approve connection from the wallet browser or refresh this page inside TronLink Discover."
+        : "Connect TronLink to continue.",
+      "muted",
+    );
   } else if (classification === "nile") {
-    setMessage("Wallet connected on MyChain test network.", "ok");
+    setMessage("Wallet already connected. Network is MyChain test mode using Nile endpoint.", "ok");
   } else if (classification === "mainnet") {
     setMessage("Wallet connected, but network appears to be Mainnet. Please switch to MyChain.", "warning");
   } else {
@@ -231,8 +258,20 @@ function refreshWalletState() {
   renderDebug();
 }
 
+function hasConnectedWallet() {
+  return Boolean(
+    selectedAddress ||
+      window.tronWeb?.defaultAddress?.base58 ||
+      window.tron?.tronWeb?.defaultAddress?.base58,
+  );
+}
+
 async function connectWallet() {
   const tronProvider = await getTronProvider();
+  if (!tronProvider && hasConnectedWallet()) {
+    refreshWalletState();
+    return;
+  }
   if (!tronProvider || typeof tronProvider.request !== "function") {
     throw new Error("TronLink provider not available");
   }
@@ -373,14 +412,30 @@ async function refreshAll() {
 
 async function onConnectClick() {
   try {
+    if (hasConnectedWallet()) {
+      refreshWalletState();
+      setMessage("Wallet already connected.", "ok");
+      return;
+    }
     await connectWallet();
+    setMessage("Wallet connected.", "ok");
   } catch (error) {
     setMessage(formatConnectionError(error, "eth_requestAccounts"), "error");
     renderDebug();
   }
 }
 
-async function onNetworkClick() {
+function onNetworkInfoClick() {
+  showManualInstructions();
+  refreshWalletState();
+  if (lastProviderState.detectedNetwork === "nile") {
+    setMessage("You are already on MyChain test mode using Nile endpoint.", "ok");
+  } else {
+    setMessage("MyChain network details are shown below. Use Try automatic switch only if you want TronLink to attempt it.", "muted");
+  }
+}
+
+async function onTrySwitchClick() {
   try {
     await switchToMyChain();
   } catch (error) {
@@ -404,10 +459,41 @@ function renderDebug() {
   );
 }
 
+async function copyText(text, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (_error) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "readonly");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    textarea.remove();
+  }
+  setMessage(`${label} copied.`, "ok");
+}
+
+function allConfigText() {
+  return [
+    "Network name: MyChain",
+    `Chain ID: ${NILE_CHAIN_ID_HEX}`,
+    `FullNode: ${EXPECTED_ENDPOINT}`,
+    `SolidityNode: ${EXPECTED_ENDPOINT}`,
+    `EventServer: ${EXPECTED_ENDPOINT}`,
+    "Explorer: https://nile.tronscan.org",
+  ].join("\n");
+}
+
 function attachEvents() {
   el.connectButton.addEventListener("click", onConnectClick);
-  el.networkButton.addEventListener("click", onNetworkClick);
+  el.networkButton.addEventListener("click", onNetworkInfoClick);
   el.refreshButton.addEventListener("click", refreshAll);
+  el.copyFullNodeButton.addEventListener("click", () => copyText(EXPECTED_ENDPOINT, "FullNode"));
+  el.copyAllConfigButton.addEventListener("click", () => copyText(allConfigText(), "MyChain config"));
+  el.trySwitchButton.addEventListener("click", onTrySwitchClick);
 
   const tron = window.tron;
   if (tron?.on) {

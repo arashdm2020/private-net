@@ -31,7 +31,7 @@
 
         <div class="actions">
           <button id="connectButton">Connect TronLink</button>
-          <button id="networkButton" class="secondary">Add / Switch to MyChain</button>
+          <button id="networkButton" class="secondary">MyChain Network Info</button>
           <button id="refreshButton" class="secondary">Refresh</button>
         </div>
 
@@ -44,6 +44,8 @@
           <dd id="currentEndpoint">Unknown</dd>
           <dt>Network mode</dt>
           <dd id="networkMode">MyChain test mode using Nile endpoints</dd>
+          <dt>Network status</dt>
+          <dd id="networkDetail">Unknown</dd>
           <dt>Expected endpoint</dt>
           <dd>https://nile.trongrid.io</dd>
           <dt>Watched MyChain address</dt>
@@ -55,7 +57,8 @@
         </dl>
 
         <section id="manualPanel" class="manual hidden">
-          <h2>Manual switch</h2>
+          <h2>MyChain network info</h2>
+          <p>MyChain is currently test mode backed by Nile endpoints. It is not a private TRON full node yet.</p>
           <ol>
             <li>Open TronLink network selector.</li>
             <li>Add custom network if available.</li>
@@ -69,6 +72,11 @@
           </ol>
           <p>Expected MyChain endpoint: <code>https://nile.trongrid.io</code></p>
           <p>Current endpoint: <code id="manualCurrentEndpoint">Unknown</code></p>
+          <div class="manual-actions">
+            <button id="copyFullNodeButton" class="secondary">Copy FullNode</button>
+            <button id="copyAllConfigButton" class="secondary">Copy all config</button>
+            <button id="trySwitchButton" class="secondary">Try automatic switch</button>
+          </div>
         </section>
       </section>
 
