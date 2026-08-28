@@ -35,15 +35,40 @@ def ledger_balance(conn: sqlite3.Connection, network: str, symbol: str) -> int:
     return int(row["balance"])
 
 
-def insert_ledger_credit(conn: sqlite3.Connection, deposit_id: int, network: str, symbol: str, amount_base_units: str) -> bool:
+def ledger_balance_for_account(conn: sqlite3.Connection, account_id: int, network: str, symbol: str) -> int:
+    row = conn.execute(
+        """
+        SELECT COALESCE(SUM(
+            CASE
+                WHEN direction = 'credit' THEN CAST(amount_base_units AS INTEGER)
+                WHEN direction = 'debit' THEN -CAST(amount_base_units AS INTEGER)
+                ELSE 0
+            END
+        ), 0) AS balance
+        FROM ledger_entries
+        WHERE account_id = ? AND network = ? AND asset_symbol = ?
+        """,
+        (account_id, network, symbol),
+    ).fetchone()
+    return int(row["balance"])
+
+
+def insert_ledger_credit(
+    conn: sqlite3.Connection,
+    deposit_id: int,
+    account_id: int | None,
+    network: str,
+    symbol: str,
+    amount_base_units: str,
+) -> bool:
     cur = conn.execute(
         """
         INSERT OR IGNORE INTO ledger_entries(
-            network, asset_symbol, amount_base_units, direction, reference_type, reference_id
+            account_id, network, asset_symbol, amount_base_units, direction, reference_type, reference_id
         )
-        VALUES (?, ?, ?, 'credit', 'bridge_deposit', ?)
+        VALUES (?, ?, ?, ?, 'credit', 'bridge_deposit', ?)
         """,
-        (network, symbol, amount_base_units, deposit_id),
+        (account_id, network, symbol, amount_base_units, deposit_id),
     )
     return cur.rowcount == 1
 
@@ -56,7 +81,7 @@ def credit_detected_deposits(
 ) -> dict[str, Any]:
     rows = conn.execute(
         """
-        SELECT id, network, asset_symbol, asset_type, contract_address, to_address,
+        SELECT id, account_id, network, asset_symbol, asset_type, contract_address, to_address,
                amount_base_units, decimals, status, confirmed_at
         FROM bridge_deposits
         WHERE network = ?
@@ -80,7 +105,7 @@ def credit_detected_deposits(
     for row in rows:
         symbol = row["asset_symbol"]
         amount = str(row["amount_base_units"])
-        inserted = insert_ledger_credit(conn, int(row["id"]), network, symbol, amount)
+        inserted = insert_ledger_credit(conn, int(row["id"]), row["account_id"], network, symbol, amount)
         if inserted:
             conn.execute(
                 """
@@ -119,8 +144,14 @@ def recent_deposits(conn: sqlite3.Connection, limit: int = 25) -> list[dict[str,
     rows = conn.execute(
         """
         SELECT d.*,
+               a.account_ref,
+               w.label AS watched_address_label,
                CASE WHEN l.id IS NULL THEN 0 ELSE 1 END AS ledger_entry_exists
         FROM bridge_deposits d
+        LEFT JOIN accounts a ON a.id = d.account_id
+        LEFT JOIN watched_addresses w
+          ON w.network = d.network
+         AND w.address = d.to_address
         LEFT JOIN ledger_entries l
           ON l.reference_type = 'bridge_deposit'
          AND l.reference_id = d.id
@@ -132,3 +163,27 @@ def recent_deposits(conn: sqlite3.Connection, limit: int = 25) -> list[dict[str,
         (limit,),
     ).fetchall()
     return [dict(row) for row in rows]
+
+
+def balance_payload(amount_base_units: int, decimals: int, price: Decimal) -> dict[str, str | int]:
+    return {
+        "amount_base_units": str(amount_base_units),
+        "decimals": decimals,
+        "human": format_units(amount_base_units, decimals),
+        "mock_usd": usd_value_base_units(amount_base_units, decimals, price),
+    }
+
+
+def account_balance_payload(
+    conn: sqlite3.Connection,
+    account_id: int,
+    network: str,
+    mock_price_usd_trx: Decimal,
+    mock_price_usd_usdt: Decimal,
+) -> dict[str, Any]:
+    trx = ledger_balance_for_account(conn, account_id, network, "TRX")
+    usdt = ledger_balance_for_account(conn, account_id, network, "USDT")
+    return {
+        "TRX": balance_payload(trx, 6, mock_price_usd_trx),
+        "USDT": balance_payload(usdt, 6, mock_price_usd_usdt),
+    }

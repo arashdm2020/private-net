@@ -7,13 +7,23 @@ CREATE TABLE IF NOT EXISTS app_state (
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
+CREATE TABLE IF NOT EXISTS accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_ref TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
 CREATE TABLE IF NOT EXISTS watched_addresses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER,
     network TEXT NOT NULL,
     address TEXT NOT NULL,
     label TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    UNIQUE(network, address)
+    UNIQUE(network, address),
+    FOREIGN KEY(account_id) REFERENCES accounts(id)
 );
 
 CREATE TABLE IF NOT EXISTS assets (
@@ -40,6 +50,7 @@ CREATE TABLE IF NOT EXISTS chain_cursors (
 
 CREATE TABLE IF NOT EXISTS bridge_deposits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER,
     network TEXT NOT NULL,
     asset_symbol TEXT NOT NULL,
     asset_type TEXT NOT NULL,
@@ -56,11 +67,13 @@ CREATE TABLE IF NOT EXISTS bridge_deposits (
     raw_json TEXT NOT NULL,
     detected_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     confirmed_at TEXT,
-    UNIQUE(network, tx_hash, log_index, asset_symbol)
+    UNIQUE(network, tx_hash, log_index, asset_symbol),
+    FOREIGN KEY(account_id) REFERENCES accounts(id)
 );
 
 CREATE TABLE IF NOT EXISTS ledger_entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER,
     network TEXT NOT NULL,
     asset_symbol TEXT NOT NULL,
     amount_base_units TEXT NOT NULL,
@@ -68,7 +81,8 @@ CREATE TABLE IF NOT EXISTS ledger_entries (
     reference_type TEXT NOT NULL,
     reference_id INTEGER NOT NULL,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    UNIQUE(reference_type, reference_id, direction)
+    UNIQUE(reference_type, reference_id, direction),
+    FOREIGN KEY(account_id) REFERENCES accounts(id)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_unique_credit

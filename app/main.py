@@ -14,7 +14,17 @@ from fastapi.staticfiles import StaticFiles
 
 from . import db
 from .config import Settings, load_settings
-from .ledger import credit_detected_deposits, format_units, ledger_balance, recent_deposits, usd_value_base_units
+from pydantic import BaseModel
+
+from .ledger import (
+    account_balance_payload,
+    balance_payload,
+    credit_detected_deposits,
+    format_units,
+    ledger_balance,
+    recent_deposits,
+    usd_value_base_units,
+)
 from .tron_nile import TronNileClient
 from .watcher import Watcher
 
@@ -29,6 +39,17 @@ with db.connect(settings.db_path) as conn:
 started_at = time.monotonic()
 watcher = Watcher(settings)
 watcher_task: asyncio.Task[Any] | None = None
+
+
+class AccountCreate(BaseModel):
+    account_ref: str
+    display_name: str
+
+
+class WatchedAddressCreate(BaseModel):
+    network: str
+    address: str
+    label: str | None = None
 
 
 @asynccontextmanager
@@ -91,10 +112,36 @@ async def balance() -> dict[str, Any]:
     with db.connect(settings.db_path) as conn:
         internal_trx = ledger_balance(conn, settings.tron_network, "TRX")
         internal_usdt = ledger_balance(conn, settings.tron_network, "USDT")
+        account_rows = conn.execute(
+            "SELECT id, account_ref, display_name, created_at FROM accounts ORDER BY id"
+        ).fetchall()
+        account_balances = [
+            {
+                "account_id": row["id"],
+                "account_ref": row["account_ref"],
+                "display_name": row["display_name"],
+                "balances": account_balance_payload(
+                    conn,
+                    row["id"],
+                    settings.tron_network,
+                    settings.mock_price_usd_trx,
+                    settings.mock_price_usd_usdt,
+                ),
+            }
+            for row in account_rows
+        ]
 
     return {
         "network": settings.tron_network,
         "watch_address": settings.watch_address,
+        "global": {
+            "TRX": balance_payload(internal_trx, 6, settings.mock_price_usd_trx),
+            "USDT": {
+                **balance_payload(internal_usdt, 6, settings.mock_price_usd_usdt),
+                "indexing_state": settings.usdt_indexing_state,
+            },
+        },
+        "accounts": account_balances,
         "native_trx_balance": {
             "available": native_trx_balance_sun is not None,
             "amount_base_units": str(native_trx_balance_sun) if native_trx_balance_sun is not None else None,
@@ -145,3 +192,75 @@ async def credit_detected() -> dict[str, Any]:
             settings.watch_address,
             settings.nile_usdt_contract_address,
         )
+
+
+@app.get("/accounts")
+async def accounts() -> dict[str, Any]:
+    with db.connect(settings.db_path) as conn:
+        rows = conn.execute(
+            "SELECT id, account_ref, display_name, created_at FROM accounts ORDER BY id"
+        ).fetchall()
+        result = []
+        for row in rows:
+            watched = conn.execute(
+                """
+                SELECT id, network, address, label, active, created_at
+                FROM watched_addresses
+                WHERE account_id = ?
+                ORDER BY id
+                """,
+                (row["id"],),
+            ).fetchall()
+            result.append(
+                {
+                    "account_id": row["id"],
+                    "account_ref": row["account_ref"],
+                    "display_name": row["display_name"],
+                    "created_at": row["created_at"],
+                    "watched_addresses": [dict(item) for item in watched],
+                    "balances": account_balance_payload(
+                        conn,
+                        row["id"],
+                        settings.tron_network,
+                        settings.mock_price_usd_trx,
+                        settings.mock_price_usd_usdt,
+                    ),
+                }
+            )
+    return {"accounts": result}
+
+
+@app.get("/accounts/{account_ref}/balance")
+async def account_balance(account_ref: str) -> dict[str, Any]:
+    with db.connect(settings.db_path) as conn:
+        account = db.get_account(conn, account_ref)
+        if account is None:
+            return {"status": "not_found", "account_ref": account_ref}
+        return {
+            "account_id": account["id"],
+            "account_ref": account["account_ref"],
+            "display_name": account["display_name"],
+            "balances": account_balance_payload(
+                conn,
+                account["id"],
+                settings.tron_network,
+                settings.mock_price_usd_trx,
+                settings.mock_price_usd_usdt,
+            ),
+        }
+
+
+@app.post("/internal/accounts")
+async def create_account(payload: AccountCreate) -> dict[str, Any]:
+    with db.connect(settings.db_path) as conn:
+        return db.create_account(conn, payload.account_ref, payload.display_name)
+
+
+@app.post("/internal/accounts/{account_ref}/watched-addresses")
+async def add_account_watched_address(account_ref: str, payload: WatchedAddressCreate) -> dict[str, Any]:
+    with db.connect(settings.db_path) as conn:
+        account = db.get_account(conn, account_ref)
+        if account is None:
+            return {"status": "not_found", "account_ref": account_ref}
+        watched = db.add_watched_address(conn, account["id"], payload.network, payload.address, payload.label)
+        return {"status": "ok", "watched_address": watched}

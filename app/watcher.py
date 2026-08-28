@@ -133,16 +133,18 @@ class Watcher:
         with db.connect(self.settings.db_path) as conn:
             for event in events:
                 status = self._status_for_confirmations(event.get("confirmations"))
+                account = db.account_for_address(conn, self.settings.tron_network, event["to_address"])
                 cur = conn.execute(
                     """
                     INSERT OR IGNORE INTO bridge_deposits(
-                        network, asset_symbol, asset_type, contract_address, tx_hash, log_index,
+                        account_id, network, asset_symbol, asset_type, contract_address, tx_hash, log_index,
                         from_address, to_address, amount_base_units, decimals, block_number,
                         confirmations, status, raw_json, confirmed_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
+                        account["id"] if account else None,
                         self.settings.tron_network,
                         event["asset_symbol"],
                         event["asset_type"],
